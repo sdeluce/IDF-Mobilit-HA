@@ -57,6 +57,19 @@
         "data": {
           "api_key": "Clé API PRIM"
         }
+      },
+      "stop_destination": {
+        "title": "Gare de destination (optionnel)",
+        "description": "Optionnel. Saisissez une gare de destination pour ne garder que les trains qui la desservent réellement (utile pour les branches du RER) et calculer l'heure d'arrivée. Laissez vide pour ignorer.",
+        "data": {
+          "query": "Gare de destination (vide = aucune)"
+        }
+      },
+      "stop_destination_select": {
+        "title": "Choisir la gare de destination",
+        "data": {
+          "stop_dest_id": "Gare de destination"
+        }
       }
     },
     "error": {
@@ -81,7 +94,9 @@
           "journey_refresh_min": "Rafraîchissement du trajet (min)",
           "active_start": "Actif à partir de",
           "active_end": "Actif jusqu'à",
-          "departures_count": "Nombre de départs"
+          "departures_count": "Nombre de départs",
+          "direct_only": "Trains directs uniquement (sans correspondance)",
+          "clear_destination": "Supprimer la gare de destination"
         },
         "description": "Le quota PRIM est de 1000 appels/jour par clé API. Appels estimés = fenêtre active / intervalle de rafraîchissement, somme sur toutes les entrées partageant cette clé ; doit rester sous 900."
       }
@@ -106,6 +121,9 @@
       },
       "walk_time": {
         "name": "Temps de marche"
+      },
+      "arrival_at": {
+        "name": "Arrivée à destination"
       }
     },
     "binary_sensor": {

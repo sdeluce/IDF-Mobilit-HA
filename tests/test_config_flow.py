@@ -60,6 +60,8 @@ async def test_stop_flow_with_line(hass):
             result = await hass.config_entries.flow.async_configure(
                 fid, {"line_id": LINE.id, "direction_filter": " Boissy "}
             )
+            assert result["step_id"] == "stop_destination"
+            result = await hass.config_entries.flow.async_configure(fid, {})
     finally:
         for p in ps:
             p.stop()
@@ -75,6 +77,71 @@ async def test_stop_flow_with_line(hass):
     assert d["stop_lat"] == STOP.lat and d["stop_lon"] == STOP.lon
 
 
+async def _to_destination_step(hass, fid):
+    await hass.config_entries.flow.async_configure(fid, {"next_step_id": "stop_search"})
+    await hass.config_entries.flow.async_configure(fid, {"query": "x"})
+    await hass.config_entries.flow.async_configure(fid, {"stop_id": STOP.id})
+    result = await hass.config_entries.flow.async_configure(fid, {})
+    assert result["step_id"] == "stop_destination"
+
+
+async def test_stop_flow_with_destination(hass):
+    ps = _patch()
+    try:
+        result = await _start(hass, ps)
+        fid = result["flow_id"]
+        await _to_destination_step(hass, fid)
+        with patch.object(
+            PrimClient, "search_places", AsyncMock(return_value=[DEST])
+        ) as search:
+            result = await hass.config_entries.flow.async_configure(fid, {"query": "defense"})
+        assert search.await_args.args == ("defense", ("stop_area",))
+        assert result["step_id"] == "stop_destination_select"
+        with patch(SETUP, return_value=True):
+            result = await hass.config_entries.flow.async_configure(
+                fid, {"stop_dest_id": DEST.id}
+            )
+    finally:
+        for p in ps:
+            p.stop()
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert result["title"] == "Châtelet → La Défense"
+    assert result["data"]["stop_dest_id"] == DEST.id
+    assert result["data"]["stop_dest_name"] == "La Défense"
+
+
+async def test_stop_flow_destination_skipped(hass):
+    ps = _patch()
+    try:
+        result = await _start(hass, ps)
+        fid = result["flow_id"]
+        await _to_destination_step(hass, fid)
+        with patch(SETUP, return_value=True):
+            result = await hass.config_entries.flow.async_configure(fid, {"query": "  "})
+    finally:
+        for p in ps:
+            p.stop()
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert result["title"] == "Châtelet"
+    assert "stop_dest_id" not in result["data"]
+    assert "stop_dest_name" not in result["data"]
+
+
+async def test_stop_flow_destination_no_results(hass):
+    ps = _patch()
+    try:
+        result = await _start(hass, ps)
+        fid = result["flow_id"]
+        await _to_destination_step(hass, fid)
+        with patch.object(PrimClient, "search_places", AsyncMock(return_value=[])):
+            result = await hass.config_entries.flow.async_configure(fid, {"query": "zzz"})
+    finally:
+        for p in ps:
+            p.stop()
+    assert result["step_id"] == "stop_destination"
+    assert result["errors"] == {"base": "no_results"}
+
+
 async def test_stop_flow_no_line_title(hass):
     ps = _patch()
     try:
@@ -83,6 +150,7 @@ async def test_stop_flow_no_line_title(hass):
         await hass.config_entries.flow.async_configure(fid, {"next_step_id": "stop_search"})
         await hass.config_entries.flow.async_configure(fid, {"query": "x"})
         await hass.config_entries.flow.async_configure(fid, {"stop_id": STOP.id})
+        await hass.config_entries.flow.async_configure(fid, {})
         with patch(SETUP, return_value=True):
             result = await hass.config_entries.flow.async_configure(fid, {})
     finally:
@@ -303,3 +371,65 @@ async def test_options_quota_sums_entries_sharing_key(hass):
         result["flow_id"], {**user, "scan_interval_s": 180}
     )
     assert result["errors"] == {"base": "quota_exceeded"}
+
+
+_OPTS = {
+    "margin_min": 5,
+    "scan_interval_s": 300,
+    "journey_refresh_min": 15,
+    "active_start": "06:00:00",
+    "active_end": "23:00:00",
+    "departures_count": 4,
+}
+
+
+async def test_options_no_destination_hides_dest_fields(hass):
+    entry = MockConfigEntry(domain=DOMAIN, unique_id="u", data={"api_key": "K"})
+    entry.add_to_hass(hass)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    keys = {str(k) for k in result["data_schema"].schema}
+    assert "direct_only" not in keys and "clear_destination" not in keys
+
+
+async def test_options_direct_only_and_keep_destination(hass):
+    data = {"api_key": "K", "stop_dest_id": DEST.id, "stop_dest_name": DEST.name}
+    entry = MockConfigEntry(domain=DOMAIN, unique_id="u", data=data)
+    entry.add_to_hass(hass)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    keys = {str(k) for k in result["data_schema"].schema}
+    assert {"direct_only", "clear_destination"} <= keys
+    with patch(SETUP, return_value=True):
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {**_OPTS, "direct_only": False}
+        )
+    assert result["data"]["direct_only"] is False
+    assert "clear_destination" not in result["data"]
+    assert entry.data["stop_dest_id"] == DEST.id
+
+
+async def test_options_direct_only_defaults_true(hass):
+    data = {"api_key": "K", "stop_dest_id": DEST.id, "stop_dest_name": DEST.name}
+    entry = MockConfigEntry(domain=DOMAIN, unique_id="u", data=data)
+    entry.add_to_hass(hass)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    with patch(SETUP, return_value=True):
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], dict(_OPTS)
+        )
+    assert result["data"]["direct_only"] is True
+
+
+async def test_options_clear_destination(hass):
+    data = {"api_key": "K", "stop_dest_id": DEST.id, "stop_dest_name": DEST.name}
+    entry = MockConfigEntry(domain=DOMAIN, unique_id="u", data=data)
+    entry.add_to_hass(hass)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    with patch(SETUP, return_value=True):
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {**_OPTS, "clear_destination": True}
+        )
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert "stop_dest_id" not in entry.data
+    assert "stop_dest_name" not in entry.data
+    assert entry.data["api_key"] == "K"
+    assert "clear_destination" not in result["data"]

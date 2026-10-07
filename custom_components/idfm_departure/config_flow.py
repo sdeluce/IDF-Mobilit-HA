@@ -34,6 +34,7 @@ from .const import (
     CONF_DEPARTURES_COUNT,
     CONF_DESTINATION_ID,
     CONF_DESTINATION_NAME,
+    CONF_DIRECT_ONLY,
     CONF_DIRECTION_FILTER,
     CONF_HOME_ENTITY,
     CONF_HOME_LAT,
@@ -44,12 +45,15 @@ from .const import (
     CONF_MARGIN_MIN,
     CONF_MODE,
     CONF_SCAN_INTERVAL_S,
+    CONF_STOP_DEST_ID,
+    CONF_STOP_DEST_NAME,
     CONF_STOP_ID,
     CONF_STOP_NAME,
     CONF_WALK_OVERRIDE_MIN,
     DEFAULT_ACTIVE_END,
     DEFAULT_ACTIVE_START,
     DEFAULT_DEPARTURES_COUNT,
+    DEFAULT_DIRECT_ONLY,
     DEFAULT_JOURNEY_REFRESH_MIN,
     DEFAULT_MARGIN_MIN,
     DEFAULT_SCAN_INTERVAL_S,
@@ -66,6 +70,7 @@ from .models import LineInfo, Place
 _LOGGER = logging.getLogger(__name__)
 
 CONF_QUERY = "query"
+CONF_CLEAR_DESTINATION = "clear_destination"
 MAX_CALLS_PER_DAY = 900  # PRIM quota is 1000/day; keep headroom
 
 
@@ -95,6 +100,9 @@ class IdfmConfigFlow(ConfigFlow, domain=DOMAIN):
         self._places: dict[str, Place] = {}
         self._stop: Place | None = None
         self._lines: list[LineInfo] = []
+        self._pending: dict[str, Any] = {}
+        self._pending_title: str = ""
+        self._pending_line_id: str | None = None
 
     def _client(self, api_key: str | None = None) -> PrimClient:
         return PrimClient(async_get_clientsession(self.hass), api_key or self._api_key)
@@ -246,11 +254,10 @@ class IdfmConfigFlow(ConfigFlow, domain=DOMAIN):
                         title = f"{self._stop.name} ({line.code})"
             if direction:
                 data[CONF_DIRECTION_FILTER] = direction
-            await self.async_set_unique_id(
-                self._unique_id(MODE_STOP, self._stop.id, line_id)
-            )
-            self._abort_if_unique_id_configured()
-            return self.async_create_entry(title=title, data=data)
+            self._pending = data
+            self._pending_title = title
+            self._pending_line_id = line_id
+            return await self.async_step_stop_destination()
 
         fields: dict[Any, Any] = {}
         if self._lines:
@@ -265,6 +272,58 @@ class IdfmConfigFlow(ConfigFlow, domain=DOMAIN):
         fields[vol.Optional(CONF_DIRECTION_FILTER)] = TextSelector()
         return self.async_show_form(
             step_id="stop_options", data_schema=vol.Schema(fields)
+        )
+
+    async def _finish_stop(self, dest: Place | None) -> ConfigFlowResult:
+        assert self._stop is not None
+        data = dict(self._pending)
+        title = self._pending_title
+        uid_line = self._pending_line_id
+        if dest is not None:
+            data[CONF_STOP_DEST_ID] = dest.id
+            data[CONF_STOP_DEST_NAME] = dest.name
+            title = f"{title} → {dest.name}"
+            uid_line = f"{uid_line or ''}_{dest.id}"
+        await self.async_set_unique_id(self._unique_id(MODE_STOP, self._stop.id, uid_line))
+        self._abort_if_unique_id_configured()
+        return self.async_create_entry(title=title, data=data)
+
+    async def async_step_stop_destination(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Optional destination station; empty query skips."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            query = (user_input.get(CONF_QUERY) or "").strip()
+            if not query:
+                return await self._finish_stop(None)
+            try:
+                places = await self._client().search_places(query, ("stop_area",))
+            except PrimAuthError:
+                errors["base"] = "invalid_auth"
+            except PrimError:
+                errors["base"] = "cannot_connect"
+            else:
+                if not places:
+                    errors["base"] = "no_results"
+                else:
+                    self._places = {p.id: p for p in places}
+                    return await self.async_step_stop_destination_select()
+        return self.async_show_form(
+            step_id="stop_destination",
+            data_schema=vol.Schema({vol.Optional(CONF_QUERY): TextSelector()}),
+            errors=errors,
+        )
+
+    async def async_step_stop_destination_select(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if user_input is not None:
+            return await self._finish_stop(self._places[user_input[CONF_STOP_DEST_ID]])
+        options = [{"value": p.id, "label": p.name} for p in self._places.values()]
+        return self.async_show_form(
+            step_id="stop_destination_select",
+            data_schema=vol.Schema({vol.Required(CONF_STOP_DEST_ID): _select(options)}),
         )
 
     # ---- destination branch -------------------------------------------
@@ -350,9 +409,19 @@ class IdfmOptionsFlow(OptionsFlow):
         errors: dict[str, str] = {}
         if user_input is not None:
             data = {k: v for k, v in user_input.items() if v is not None}
+            clear = data.pop(CONF_CLEAR_DESTINATION, False)
             if self._estimated_calls_per_day(data) > MAX_CALLS_PER_DAY:
                 errors["base"] = "quota_exceeded"
             else:
+                if clear:
+                    new_data = {
+                        k: v
+                        for k, v in self.config_entry.data.items()
+                        if k not in (CONF_STOP_DEST_ID, CONF_STOP_DEST_NAME)
+                    }
+                    self.hass.config_entries.async_update_entry(
+                        self.config_entry, data=new_data
+                    )
                 return self.async_create_entry(title="", data=data)
 
         opts = self.config_entry.options
@@ -360,8 +429,19 @@ class IdfmOptionsFlow(OptionsFlow):
         walk_key = (
             vol.Optional(CONF_WALK_OVERRIDE_MIN, description={"suggested_value": walk})
         )
+        has_dest = bool(self.config_entry.data.get(CONF_STOP_DEST_ID))
+        dest_fields: dict[Any, Any] = {}
+        if has_dest:
+            dest_fields[
+                vol.Required(
+                    CONF_DIRECT_ONLY,
+                    default=opts.get(CONF_DIRECT_ONLY, DEFAULT_DIRECT_ONLY),
+                )
+            ] = bool
+            dest_fields[vol.Required(CONF_CLEAR_DESTINATION, default=False)] = bool
         schema = vol.Schema(
             {
+                **dest_fields,
                 vol.Required(
                     CONF_MARGIN_MIN, default=opts.get(CONF_MARGIN_MIN, DEFAULT_MARGIN_MIN)
                 ): vol.All(vol.Coerce(int), vol.Range(min=0, max=30)),

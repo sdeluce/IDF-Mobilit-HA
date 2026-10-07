@@ -167,6 +167,22 @@ async def test_get_journeys_params_and_parse(client, aioclient_mock):
     assert q["data_freshness"] == "realtime" and q["count"] == "2"
 
 
+async def test_get_journeys_max_nb_transfers_param(client, aioclient_mock):
+    aioclient_mock.get(JOURNEYS, json=load_fixture_json("navitia_stop_journeys.json"))
+    opts = await client.get_journeys(
+        "stop_area:IDFM:71517", "stop_area:IDFM:71518", WHEN, count=3, max_nb_transfers=0
+    )
+    assert len(opts) == 3
+    q = aioclient_mock.mock_calls[0][1].query
+    assert q["from"] == "stop_area:IDFM:71517" and q["max_nb_transfers"] == "0"
+
+
+async def test_get_journeys_no_max_nb_transfers_by_default(client, aioclient_mock):
+    aioclient_mock.get(JOURNEYS, json=load_fixture_json("navitia_stop_journeys.json"))
+    await client.get_journeys("2.347;48.8584", "stop_area:IDFM:71517", WHEN)
+    assert "max_nb_transfers" not in aioclient_mock.mock_calls[0][1].query
+
+
 async def test_get_journeys_no_solution_is_empty(client, aioclient_mock):
     aioclient_mock.get(JOURNEYS, status=404)
     aioclient_mock.get(f"{NAVITIA_BASE_URL}/coverage/idfm/journeys", status=404)

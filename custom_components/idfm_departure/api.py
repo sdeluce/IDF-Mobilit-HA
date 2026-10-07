@@ -236,7 +236,12 @@ class PrimClient:
         return parse_lines(data) if isinstance(data, dict) else []
 
     async def get_journeys(
-        self, from_: str, to: str, when: datetime, count: int = 3
+        self,
+        from_: str,
+        to: str,
+        when: datetime,
+        count: int = 3,
+        max_nb_transfers: int | None = None,
     ) -> list[JourneyOption]:
         """Navitia journeys; no solution gives []."""
         params: Params = [
@@ -246,6 +251,8 @@ class PrimClient:
             ("data_freshness", "realtime"),
             ("count", str(count)),
         ]
+        if max_nb_transfers is not None:
+            params.append(("max_nb_transfers", str(max_nb_transfers)))
         try:
             data = await self._navitia("/journeys", params)
         except PrimNotFoundError:

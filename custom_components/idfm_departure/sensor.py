@@ -68,9 +68,13 @@ def _attrs_leave_at(data: IdfmData) -> dict[str, Any]:
         "line_text_color": n.line_text_color if n else None,
         "mode": n.mode if n else None,
         "direction": n.direction if n else None,
+        "platform": n.platform if n else None,
         "stop_departure": n.stop_departure.astimezone(UTC).isoformat() if n else None,
         "walk_min": n.walk_min if n else None,
         "realtime": n.realtime if n else None,
+        "arrival_at": n.arrival_at.astimezone(UTC).isoformat()
+        if n and n.arrival_at
+        else None,
     }
     return {
         "stop_name": data.stop_name,
@@ -82,6 +86,11 @@ def _attrs_leave_at(data: IdfmData) -> dict[str, Any]:
         if data.last_api_update
         else None,
     }
+
+
+def _val_arrival(data: IdfmData) -> datetime | None:
+    n = _next(data)
+    return n.arrival_at if n else None
 
 
 def _attrs_stop_dep(data: IdfmData) -> dict[str, Any]:
@@ -145,12 +154,23 @@ SENSORS: tuple[IdfmSensorDescription, ...] = (
 )
 
 
+ARRIVAL_SENSOR = IdfmSensorDescription(
+    key="arrival_at",
+    translation_key="arrival_at",
+    device_class=SensorDeviceClass.TIMESTAMP,
+    value_fn=_val_arrival,
+)
+
+
 async def async_setup_entry(
     hass: HomeAssistant, entry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up sensors."""
     coordinator: IdfmCoordinator = entry.runtime_data
-    async_add_entities(IdfmSensor(coordinator, d) for d in SENSORS)
+    descriptions = list(SENSORS)
+    if coordinator.has_destination:
+        descriptions.append(ARRIVAL_SENSOR)
+    async_add_entities(IdfmSensor(coordinator, d) for d in descriptions)
 
 
 class IdfmSensor(CoordinatorEntity[IdfmCoordinator], SensorEntity):
@@ -190,4 +210,10 @@ class IdfmSensor(CoordinatorEntity[IdfmCoordinator], SensorEntity):
     def extra_state_attributes(self) -> dict[str, Any] | None:
         data = self.coordinator.data
         fn = self.entity_description.attrs_fn
-        return fn(data) if data is not None and fn else None
+        if data is None or not fn:
+            return None
+        attrs = fn(data)
+        if self.entity_description.key == "leave_at":
+            attrs["destination_name"] = self.coordinator.destination_name
+            attrs["destination_filter_active"] = self.coordinator.destination_filter_active
+        return attrs

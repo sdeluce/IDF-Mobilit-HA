@@ -21,13 +21,15 @@ from custom_components.idfm_departure.const import (
     CONF_HOME_LAT,
     CONF_HOME_LON,
     CONF_MODE,
+    CONF_STOP_DEST_ID,
+    CONF_STOP_DEST_NAME,
     CONF_STOP_ID,
     CONF_STOP_NAME,
     DOMAIN,
     MODE_STOP,
     SERVICE_REFRESH,
 )
-from custom_components.idfm_departure.models import LineInfo, StopVisit
+from custom_components.idfm_departure.models import JourneyOption, LineInfo, StopVisit
 
 # 10:00 Paris: inside the default active window
 NOW = datetime(2026, 10, 7, 8, 0, tzinfo=UTC)
@@ -47,6 +49,7 @@ def _visit() -> StopVisit:
         stop_ref="STIF:StopArea:SP:71517:",
         departure_at=LEAVE_AT + timedelta(minutes=8),
         realtime=True,
+        platform="2",
     )
 
 
@@ -201,6 +204,8 @@ async def test_leave_at_attributes_for_card(hass, freezer) -> None:
         assert a["walk_min"] == 5
         assert a["realtime"] is True
         assert a["direction"] == "Marne-la-Vallée"
+        assert a["platform"] == "2"
+        assert a["departures"][0]["platform"] == "2"
         assert a["departures"][0]["line_color"] == "#E2231A"
         assert a["departures"][0]["line_text_color"] == "#FFFFFF"
         await hass.config_entries.async_unload(entry.entry_id)
@@ -227,3 +232,54 @@ async def test_static_path_registered_once(hass) -> None:
     assert cfgs[0].cache_headers is False
     add_js.assert_called_once()
     assert add_js.call_args.args[1] == "/idfm_departure_static/idfm-departure-card.js?v=0.1.0"
+
+
+async def test_arrival_sensor_only_with_destination(hass, freezer) -> None:
+    freezer.move_to(NOW)
+    m = _Mocks()
+    entry = _entry(hass)
+    reg = er.async_get(hass)
+    with _patches(m):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        assert reg.async_get_entity_id("sensor", DOMAIN, f"{entry.entry_id}_arrival_at") is None
+        attrs = hass.states.get(_eid(hass, "sensor", entry, "leave_at")).attributes
+        assert attrs["arrival_at"] is None
+        assert attrs["destination_name"] is None
+        assert attrs["destination_filter_active"] is True
+
+
+async def test_arrival_sensor_with_stop_destination(hass, freezer) -> None:
+    freezer.move_to(NOW)
+    m = _Mocks()
+    arrival = _visit().departure_at + timedelta(minutes=30)
+    journey = JourneyOption(
+        walk_s=0,
+        pt_departure_at=_visit().departure_at,
+        stop_point_id="stop_point:IDFM:22113",
+        stop_name="Châtelet",
+        line_id=LINE,
+        line_code="A",
+        mode="rer",
+        direction=None,
+        arrival_at=arrival,
+    )
+    journeys = AsyncMock(return_value=[journey])
+    entry = _entry(hass)
+    hass.config_entries.async_update_entry(
+        entry,
+        data={
+            **entry.data,
+            CONF_STOP_DEST_ID: "stop_area:IDFM:62000",
+            CONF_STOP_DEST_NAME: "La Défense",
+        },
+    )
+    with _patches(m), patch.object(PrimClient, "get_journeys", journeys):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        state = hass.states.get(_eid(hass, "sensor", entry, "arrival_at"))
+        assert state.state == arrival.isoformat()
+        attrs = hass.states.get(_eid(hass, "sensor", entry, "leave_at")).attributes
+        assert attrs["arrival_at"] == arrival.isoformat()
+        assert attrs["destination_name"] == "La Défense"
+        assert attrs["destination_filter_active"] is True

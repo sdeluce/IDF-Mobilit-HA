@@ -25,6 +25,8 @@ from custom_components.idfm_departure.const import (
     CONF_HOME_LON,
     CONF_LINE_ID,
     CONF_MODE,
+    CONF_STOP_DEST_ID,
+    CONF_STOP_DEST_NAME,
     CONF_STOP_ID,
     CONF_STOP_NAME,
     CONF_WALK_OVERRIDE_MIN,
@@ -444,4 +446,132 @@ async def test_lines_error_retried_after_15_min(hass, freezer) -> None:
     freezer.move_to(NOW + timedelta(minutes=16))
     await coord._async_update_data()
     assert client.get_stop_area_lines.await_count == 2
+    await coord.async_shutdown()
+
+
+DEST = {CONF_STOP_DEST_ID: "stop_area:IDFM:62000", CONF_STOP_DEST_NAME: "La Défense"}
+
+
+def _dest_client() -> MagicMock:
+    client = _client()
+    # only the first SIRI visit (+15) reaches the destination
+    client.get_journeys = AsyncMock(return_value=[_journey(15)])
+    return client
+
+
+async def test_stop_dest_filters_and_computes_arrival(hass, freezer) -> None:
+    freezer.move_to(NOW)
+    client = _dest_client()
+    coord = await _make(hass, client, data=DEST)
+    data = await coord._async_update_data()
+    client.get_journeys.assert_awaited_once()
+    args, kwargs = client.get_journeys.await_args
+    assert args[0] == STOP
+    assert args[1] == DEST[CONF_STOP_DEST_ID]
+    # default margin 3 min + walk 300 s
+    assert args[2] == NOW + timedelta(seconds=300, minutes=3)
+    assert kwargs["max_nb_transfers"] == 0
+    assert kwargs["count"] == 6
+    assert len(data.departures) == 1  # the +25 visit is another branch
+    assert data.departures[0].stop_departure == NOW + timedelta(minutes=15)
+    assert data.departures[0].arrival_at == NOW + timedelta(minutes=45)
+    assert coord.destination_filter_active is True
+    assert coord.destination_name == "La Défense"
+    await coord.async_shutdown()
+
+
+async def test_stop_dest_direct_only_false_allows_transfers(hass, freezer) -> None:
+    freezer.move_to(NOW)
+    client = _dest_client()
+    coord = await _make(hass, client, data=DEST, options={"direct_only": False})
+    await coord._async_update_data()
+    assert client.get_journeys.await_args.kwargs["max_nb_transfers"] is None
+    await coord.async_shutdown()
+
+
+async def test_stop_dest_navitia_failure_falls_back_to_siri(hass, freezer) -> None:
+    freezer.move_to(NOW)
+    client = _dest_client()
+    client.get_journeys = AsyncMock(side_effect=PrimServerError("boom"))
+    coord = await _make(hass, client, data=DEST)
+    data = await coord._async_update_data()
+    assert len(data.departures) == 2  # plain SIRI, unfiltered
+    assert coord.destination_filter_active is False
+    await coord.async_shutdown()
+
+
+async def test_stop_dest_navitia_failure_keeps_cache(hass, freezer) -> None:
+    freezer.move_to(NOW)
+    client = _dest_client()
+    coord = await _make(hass, client, data=DEST, options={"journey_refresh_min": 5})
+    await coord._async_update_data()
+    client.get_journeys = AsyncMock(side_effect=PrimServerError("boom"))
+    freezer.move_to(NOW + timedelta(minutes=6))  # cache stale, leave_at is NOW+7
+    data = await coord._async_update_data()
+    client.get_journeys.assert_awaited_once()  # refresh was attempted and failed
+    assert len(data.departures) == 1
+    assert coord.destination_filter_active is True
+    await coord.async_shutdown()
+
+
+async def test_stop_dest_failure_backs_off_5_min(hass, freezer) -> None:
+    freezer.move_to(NOW)
+    client = _dest_client()
+    client.get_journeys = AsyncMock(side_effect=PrimServerError("boom"))
+    coord = await _make(hass, client, data=DEST)
+    await coord._async_update_data()
+    freezer.move_to(NOW + timedelta(minutes=2))
+    data = await coord._async_update_data()
+    assert client.get_journeys.await_count == 1  # backoff: no Navitia call
+    assert len(data.departures) == 2  # plain SIRI fallback
+    assert coord.destination_filter_active is False
+    freezer.move_to(NOW + timedelta(minutes=5, seconds=1))
+    await coord._async_update_data()
+    assert client.get_journeys.await_count == 2
+    await coord.async_shutdown()
+
+
+async def test_stop_dest_failure_with_cache_backs_off(hass, freezer) -> None:
+    freezer.move_to(NOW)
+    client = _dest_client()
+    coord = await _make(hass, client, data=DEST, options={"journey_refresh_min": 5})
+    await coord._async_update_data()
+    good = client.get_journeys
+    client.get_journeys = AsyncMock(side_effect=PrimServerError("boom"))
+    freezer.move_to(NOW + timedelta(minutes=6))
+    await coord._async_update_data()
+    freezer.move_to(NOW + timedelta(minutes=8))
+    await coord._async_update_data()
+    assert client.get_journeys.await_count == 1  # second scan within 5 min skipped
+    freezer.move_to(NOW + timedelta(minutes=11, seconds=1))
+    await coord._async_update_data()
+    assert client.get_journeys.await_count == 2
+    assert good.await_count == 1
+    await coord.async_shutdown()
+
+
+async def test_stop_dest_journeys_cached_between_scans(hass, freezer) -> None:
+    freezer.move_to(NOW)
+    client = _dest_client()
+    coord = await _make(hass, client, data=DEST)
+    await coord._async_update_data()
+    freezer.move_to(NOW + timedelta(minutes=5))
+    await coord._async_update_data()
+    assert client.get_journeys.await_count == 1
+    assert client.get_stop_monitoring.await_count == 2  # SIRI every scan
+    freezer.move_to(NOW + timedelta(minutes=11))
+    await coord._async_update_data()
+    assert client.get_journeys.await_count == 2
+    await coord.async_shutdown()
+
+
+async def test_stop_without_dest_makes_no_journey_call(hass, freezer) -> None:
+    freezer.move_to(NOW)
+    client = _client()
+    coord = await _make(hass, client)
+    data = await coord._async_update_data()
+    client.get_journeys.assert_not_awaited()
+    assert len(data.departures) == 2
+    assert coord.destination_filter_active is True
+    assert coord.destination_name is None
     await coord.async_shutdown()

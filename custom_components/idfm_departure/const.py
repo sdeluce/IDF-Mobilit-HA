@@ -25,6 +25,8 @@ CONF_LINE_NAME = "line_name"
 CONF_DIRECTION_FILTER = "direction_filter"
 CONF_DESTINATION_ID = "destination_id"
 CONF_DESTINATION_NAME = "destination_name"
+CONF_STOP_DEST_ID = "stop_dest_id"
+CONF_STOP_DEST_NAME = "stop_dest_name"
 MODE_STOP = "stop"
 MODE_JOURNEY = "journey"
 
@@ -42,6 +44,8 @@ CONF_ACTIVE_END = "active_end"
 DEFAULT_ACTIVE_END = "01:00"
 CONF_DEPARTURES_COUNT = "departures_count"
 DEFAULT_DEPARTURES_COUNT = 3
+CONF_DIRECT_ONLY = "direct_only"
+DEFAULT_DIRECT_ONLY = True
 MIN_SCAN_INTERVAL_S = 60
 MAX_SCAN_INTERVAL_S = 3600
 

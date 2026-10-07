@@ -29,6 +29,8 @@ from .const import (
     CONF_ACTIVE_START,
     CONF_DEPARTURES_COUNT,
     CONF_DESTINATION_ID,
+    CONF_DESTINATION_NAME,
+    CONF_DIRECT_ONLY,
     CONF_DIRECTION_FILTER,
     CONF_HOME_LAT,
     CONF_HOME_LON,
@@ -37,12 +39,15 @@ from .const import (
     CONF_MARGIN_MIN,
     CONF_MODE,
     CONF_SCAN_INTERVAL_S,
+    CONF_STOP_DEST_ID,
+    CONF_STOP_DEST_NAME,
     CONF_STOP_ID,
     CONF_STOP_NAME,
     CONF_WALK_OVERRIDE_MIN,
     DEFAULT_ACTIVE_END,
     DEFAULT_ACTIVE_START,
     DEFAULT_DEPARTURES_COUNT,
+    DEFAULT_DIRECT_ONLY,
     DEFAULT_JOURNEY_REFRESH_MIN,
     DEFAULT_MARGIN_MIN,
     DEFAULT_SCAN_INTERVAL_S,
@@ -58,6 +63,7 @@ from .const import (
 from .logic import (
     coord,
     departures_from_journeys,
+    departures_from_stop_journeys,
     departures_from_visits,
     filter_visits,
     in_active_window,
@@ -107,6 +113,8 @@ class IdfmCoordinator(DataUpdateCoordinator[IdfmData]):
         self._lines_at: datetime | None = None
         self._journeys: list[JourneyOption] | None = None
         self._journeys_at: datetime | None = None
+        self._journeys_retry_at: datetime | None = None
+        self.destination_filter_active: bool = True
         self._unsub_tick: CALLBACK_TYPE | None = async_track_time_interval(
             hass, self._async_tick, timedelta(seconds=LOCAL_TICK_S)
         )
@@ -130,6 +138,21 @@ class IdfmCoordinator(DataUpdateCoordinator[IdfmData]):
             _FORCE.reset(token)
 
     # ------------------------------------------------------------------
+    @property
+    def destination_name(self) -> str | None:
+        """Name of the destination (stop dest or journey destination), if any."""
+        cfg = self.config_entry.data
+        if cfg.get(CONF_MODE, MODE_STOP) == MODE_JOURNEY:
+            return cfg.get(CONF_DESTINATION_NAME)
+        return cfg.get(CONF_STOP_DEST_NAME) if cfg.get(CONF_STOP_DEST_ID) else None
+
+    @property
+    def has_destination(self) -> bool:
+        cfg = self.config_entry.data
+        return cfg.get(CONF_MODE, MODE_STOP) == MODE_JOURNEY or bool(
+            cfg.get(CONF_STOP_DEST_ID)
+        )
+
     def _opt(self, key: str, default):
         value = self.config_entry.options.get(key)
         return default if value is None else value
@@ -270,7 +293,46 @@ class IdfmCoordinator(DataUpdateCoordinator[IdfmData]):
             navitia_to_siri(stop_id), navitia_to_siri(line_id) if line_id else None
         )
         visits = filter_visits(visits, line_id, cfg.get(CONF_DIRECTION_FILTER))
+        dest_id = cfg.get(CONF_STOP_DEST_ID)
+        if dest_id:
+            options = await self._stop_dest_journeys(
+                cfg, stop_id, dest_id, now, walk_s, margin, count
+            )
+            if options is not None:
+                self.destination_filter_active = True
+                return departures_from_stop_journeys(
+                    options, visits, walk_s, margin, now, count, self._lines
+                )
+            self.destination_filter_active = False
+        else:
+            self.destination_filter_active = True
         return departures_from_visits(visits, walk_s, margin, now, count, self._lines)
+
+    async def _stop_dest_journeys(self, cfg, stop_id, dest_id, now, walk_s, margin, count):
+        """Cached Navitia journeys stop -> destination; None if unavailable."""
+        ttl = self._opt(CONF_JOURNEY_REFRESH_MIN, DEFAULT_JOURNEY_REFRESH_MIN) * 60
+        backoff = self._journeys_retry_at is not None and now < self._journeys_retry_at
+        if (
+            self._journeys is None or not self._fresh(self._journeys_at, now, ttl)
+        ) and not backoff:
+            direct = self._opt(CONF_DIRECT_ONLY, DEFAULT_DIRECT_ONLY)
+            try:
+                self._journeys = await self.client.get_journeys(
+                    stop_id,
+                    dest_id,
+                    now + timedelta(seconds=walk_s, minutes=margin),
+                    count=max(count * 2, 6),
+                    max_nb_transfers=0 if direct else None,
+                )
+                self._journeys_at = now
+                self._journeys_retry_at = None
+            except PrimAuthError:
+                raise
+            except PrimError as err:
+                _LOGGER.warning("Destination journeys failed: %s", err)
+                # keep any cache; back off before retrying Navitia
+                self._journeys_retry_at = now + timedelta(minutes=5)
+        return self._journeys
 
     async def _fetch_journey(self, cfg, home, now, override_s, margin, count):
         ttl = self._opt(CONF_JOURNEY_REFRESH_MIN, DEFAULT_JOURNEY_REFRESH_MIN) * 60

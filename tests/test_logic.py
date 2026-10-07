@@ -1,5 +1,6 @@
 """Tests for the pure logic module."""
 
+from dataclasses import replace
 from datetime import UTC, datetime, time, timedelta
 
 import pytest
@@ -156,6 +157,33 @@ def test_parse_stop_monitoring_fixture(siri_payload):
     # arrival fallback (Expected arrival => realtime)
     assert v6.departure_at == utc(7, 50) and v6.realtime is True
     assert v6.direction is None
+    # platform: wrapped Departure, plain Arrival (stripped), none
+    assert v1.platform == "2"
+    assert v2.platform == "B"
+    assert v3.platform is None and v6.platform is None
+
+
+@pytest.mark.parametrize(
+    ("call_extra", "expected"),
+    [
+        ({"DeparturePlatformName": {"value": "4"}}, "4"),
+        ({"DeparturePlatformName": "  ", "ArrivalPlatformName": "7"}, "7"),
+        ({"DeparturePlatformName": "1", "ArrivalPlatformName": "7"}, "1"),
+        ({"ArrivalStopAssignment": {"ExpectedQuayName": [{"value": "Q1"}]}}, "Q1"),
+        ({"ArrivalStopAssignment": [{"AimedQuayName": "Q2"}]}, "Q2"),
+        ({"ArrivalStopAssignment": {"ExpectedQuayName": "E", "AimedQuayName": "A"}}, "E"),
+        ({"ArrivalStopAssignment": "garbage", "DeparturePlatformName": []}, None),
+        ({}, None),
+    ],
+)
+def test_parse_platform_variants(call_extra, expected):
+    call = {"AimedDepartureTime": "2026-10-07T07:18:00.000Z", **call_extra}
+    for mc in (call, [call]):
+        payload = {"Siri": {"ServiceDelivery": {"StopMonitoringDelivery": [{
+            "MonitoredStopVisit": [{"MonitoredVehicleJourney": {
+                "LineRef": "STIF:Line::C01742:", "MonitoredCall": mc}}]}]}}}
+        (v,) = parse_stop_monitoring(payload)
+        assert v.platform == expected
 
 
 def test_parse_stop_monitoring_empty_and_garbage(siri_empty):
@@ -470,7 +498,8 @@ def test_planned_departure_attr_and_upcoming():
         "stop_departure": "2026-10-07T07:20:00+00:00",
         "leave_at": "2026-10-07T07:10:00+00:00",
         "realtime": True, "walk_min": 7, "line_id": None,
-            "line_color": None, "line_text_color": None,
+            "line_color": None, "line_text_color": None, "arrival_at": None,
+        "platform": None,
     }
     data = IdfmData("stop", [d2, d1], 400, "auto", None, None, True, {"siri": 0, "navitia": 0})
     assert data.upcoming(NOW) == [d1]
@@ -511,3 +540,112 @@ def test_parse_lines_text_color_and_departure_colors():
     dep = departures_from_visits([visit], 300, 3, NOW, 5, {"C1": infos["line:IDFM:C1"]})[0]
     assert (dep.line_color, dep.line_text_color) == ("#FFBE00", "#000000")
     assert dep.as_attr()["line_color"] == "#FFBE00"
+
+
+# --- stop mode with destination station -------------------------------------
+
+from custom_components.idfm_departure.logic import departures_from_stop_journeys  # noqa: E402
+from custom_components.idfm_departure.models import StopVisit  # noqa: E402
+
+_SJ_NOW = datetime(2026, 10, 7, 7, 0, tzinfo=UTC)
+
+
+def _sj():
+    options = parse_journeys(load_fixture_json("navitia_stop_journeys.json"))
+    visits = parse_stop_monitoring(load_fixture_json("siri_stop_journeys.json"))
+    return options, visits
+
+
+def _plan(options, visits, now=_SJ_NOW, count=10, walk_s=300, margin=2):
+    return departures_from_stop_journeys(options, visits, walk_s, margin, now, count, {})
+
+
+def test_stop_journeys_parse_new_fields():
+    options, visits = _sj()
+    assert [o.nb_transfers for o in options] == [0, 0, 1]
+    assert options[0].base_pt_departure_at == datetime(2026, 10, 7, 7, 10, tzinfo=UTC)
+    assert options[0].arrival_at == datetime(2026, 10, 7, 7, 40, tzinfo=UTC)
+    assert visits[2].aimed_departure_at == datetime(2026, 10, 7, 7, 20, tzinfo=UTC)
+    assert visits[2].departure_at == datetime(2026, 10, 7, 7, 24, tzinfo=UTC)
+
+
+def test_stop_journeys_match_delay_and_wrong_branch_dropped():
+    options, visits = _sj()
+    res = _plan(options, visits)
+    assert len(res) == 3  # 3 journeys; the 07:15 other-branch visit yields nothing
+    assert all(d.stop_departure != datetime(2026, 10, 7, 7, 15, tzinfo=UTC) for d in res)
+    on_time, delayed, unmatched = res
+    assert on_time.source == SOURCE_SIRI and on_time.realtime is True
+    assert on_time.arrival_at == datetime(2026, 10, 7, 7, 40, tzinfo=UTC)
+    # +4 min delay propagates to arrival
+    assert delayed.source == SOURCE_SIRI
+    assert delayed.stop_departure == datetime(2026, 10, 7, 7, 24, tzinfo=UTC)
+    assert delayed.arrival_at == datetime(2026, 10, 7, 7, 54, tzinfo=UTC)
+    assert delayed.leave_at == datetime(2026, 10, 7, 7, 17, tzinfo=UTC)  # -5 walk -2 margin
+    # unmatched falls back to Navitia times
+    assert unmatched.source == SOURCE_NAVITIA and unmatched.realtime is False
+    assert unmatched.stop_departure == datetime(2026, 10, 7, 7, 30, tzinfo=UTC)
+    assert unmatched.arrival_at == datetime(2026, 10, 7, 8, 0, tzinfo=UTC)
+    assert unmatched.line == "A" and unmatched.line_color == "#E2231A"
+
+
+def test_stop_journeys_past_dropped_and_count_cap():
+    options, visits = _sj()
+    now = datetime(2026, 10, 7, 7, 4, tzinfo=UTC)  # first leave_at is 07:03
+    res = _plan(options, visits, now=now)
+    assert [d.stop_departure.minute for d in res] == [24, 30]
+    assert len(_plan(options, visits, count=1)) == 1
+
+
+def test_stop_journeys_each_visit_used_once():
+    options, visits = _sj()
+    # two identical journeys, only one matching visit -> second falls back to Navitia
+    res = _plan([options[0], options[0]], visits)
+    assert sorted(d.source for d in res) == [SOURCE_NAVITIA, SOURCE_SIRI]
+
+
+def test_stop_journeys_tolerance_90s():
+    options, _ = _sj()
+    base = options[0].base_pt_departure_at
+
+    def visit(offset_s):
+        t = base + timedelta(seconds=offset_s)
+        return StopVisit("STIF:Line::C01742:", None, None, None, None, t, True, t)
+
+    assert _plan([options[0]], [visit(90)])[0].source == SOURCE_SIRI
+    assert _plan([options[0]], [visit(91)])[0].source == SOURCE_NAVITIA
+
+
+def test_stop_journeys_other_line_not_matched():
+    options, _ = _sj()
+    t = options[0].base_pt_departure_at
+    other = StopVisit("STIF:Line::C01743:", None, None, None, None, t, True, t)
+    assert _plan([options[0]], [other])[0].source == SOURCE_NAVITIA
+
+
+def test_departures_from_journeys_fills_arrival_and_as_attr():
+    options, _ = _sj()
+    res = departures_from_journeys(options, None, 0, _SJ_NOW, 5)
+    assert res[0].arrival_at == datetime(2026, 10, 7, 7, 40, tzinfo=UTC)
+    assert res[0].as_attr()["arrival_at"] == "2026-10-07T07:40:00+00:00"
+    assert replace(res[0], arrival_at=None).as_attr()["arrival_at"] is None
+
+
+def test_platform_propagation():
+    # departures_from_visits
+    visits = parse_stop_monitoring(load_fixture_json("siri_stop_monitoring.json"))
+    res = departures_from_visits(visits, 0, 0, utc(7, 0), 10, {})
+    by_dep = {d.stop_departure: d for d in res}
+    assert by_dep[utc(7, 20)].platform == "2"
+    assert by_dep[utc(7, 35)].platform == "B"
+    assert by_dep[utc(7, 12)].platform is None
+    assert by_dep[utc(7, 20)].as_attr()["platform"] == "2"
+    # departures_from_stop_journeys: matched carry platform, unmatched None
+    options, jv = _sj()
+    on_time, delayed, unmatched = _plan(options, jv)
+    assert on_time.platform == "2"
+    assert delayed.platform == "C"
+    assert unmatched.source == SOURCE_NAVITIA and unmatched.platform is None
+    # journey-only
+    solo = departures_from_stop_journeys(options, [], 300, 2, _SJ_NOW, 10, {})
+    assert solo and all(d.platform is None for d in solo)

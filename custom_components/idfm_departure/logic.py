@@ -169,6 +169,23 @@ def _first_dict(x: Any) -> dict:
     return {}
 
 
+def _platform_of(call: dict) -> str | None:
+    """Best-effort platform/quay name from a MonitoredCall (shape unverified)."""
+    candidates: list[Any] = [
+        call.get("DeparturePlatformName"),
+        call.get("ArrivalPlatformName"),
+    ]
+    for assignment in _as_list(call.get("ArrivalStopAssignment")):
+        if isinstance(assignment, dict):
+            candidates.append(assignment.get("ExpectedQuayName"))
+            candidates.append(assignment.get("AimedQuayName"))
+    for c in candidates:
+        v = _val(c)
+        if v is not None and v.strip():
+            return v.strip()
+    return None
+
+
 def parse_stop_monitoring(payload: dict) -> list[StopVisit]:
     """Parse a SIRI stop-monitoring response (tolerant of odd shapes)."""
     visits: list[StopVisit] = []
@@ -189,6 +206,9 @@ def parse_stop_monitoring(payload: dict) -> list[StopVisit]:
             call = _first_dict(mvj.get("MonitoredCall"))
             chosen: datetime | None = None
             realtime = False
+            aimed = parse_siri_datetime(
+                _val(call.get("AimedDepartureTime"))
+            ) or parse_siri_datetime(_val(call.get("AimedArrivalTime")))
             for key, is_rt in (
                 ("ExpectedDepartureTime", True),
                 ("AimedDepartureTime", False),
@@ -215,6 +235,8 @@ def parse_stop_monitoring(payload: dict) -> list[StopVisit]:
                     stop_ref=stop_ref,
                     departure_at=chosen,
                     realtime=realtime,
+                    aimed_departure_at=aimed,
+                    platform=_platform_of(call),
                 )
             )
     return visits
@@ -344,6 +366,8 @@ def _journey_option(j: dict) -> JourneyOption | None:
         arrival_at=_navitia_dt(j.get("arrival_date_time")),
         color=normalize_color(di.get("color")),
         text_color=normalize_color(di.get("text_color")),
+        base_pt_departure_at=_navitia_dt(pt.get("base_departure_date_time")),
+        nb_transfers=_int(j.get("nb_transfers")),
     )
 
 
@@ -442,6 +466,7 @@ def departures_from_visits(
                 line_id=nid,
                 line_color=info.color if info else None,
                 line_text_color=info.text_color if info else None,
+                platform=v.platform,
             )
         )
     out.sort(key=lambda d: d.leave_at)
@@ -475,6 +500,80 @@ def departures_from_journeys(
                 line_id=numeric_id(o.line_id) if o.line_id else None,
                 line_color=o.color,
                 line_text_color=o.text_color,
+                arrival_at=o.arrival_at,
+            )
+        )
+    out.sort(key=lambda d: d.leave_at)
+    return out[:count]
+
+
+_MATCH_TOLERANCE_S = 90
+
+
+def departures_from_stop_journeys(
+    options: list[JourneyOption],
+    visits: list[StopVisit],
+    walk_s: int,
+    margin_min: int,
+    now: datetime,
+    count: int,
+    lines: dict[str, LineInfo],
+) -> list[PlannedDeparture]:
+    """Plan departures from stop->destination journeys, enriched with SIRI.
+
+    Each journey is matched to at most one SIRI visit (same line, aimed time
+    within 90 s of the journey's base departure). SIRI visits that match no
+    journey (other branch) are dropped.
+    """
+    used: set[int] = set()
+    out: list[PlannedDeparture] = []
+    for o in options:
+        base = o.base_pt_departure_at or o.pt_departure_at
+        oid = numeric_id(o.line_id) if o.line_id else None
+        best: int | None = None
+        best_gap = float(_MATCH_TOLERANCE_S) + 1
+        if oid:
+            for i, v in enumerate(visits):
+                if i in used or numeric_id(v.line_ref) != oid:
+                    continue
+                gap = abs(((v.aimed_departure_at or v.departure_at) - base).total_seconds())
+                if gap <= _MATCH_TOLERANCE_S and gap < best_gap:
+                    best, best_gap = i, gap
+        info = lines.get(oid) if oid else None
+        if best is not None:
+            used.add(best)
+            v = visits[best]
+            stop_dep = v.departure_at
+            realtime = v.realtime
+            arrival = (
+                o.arrival_at + (v.departure_at - base) if o.arrival_at else None
+            )
+            source = SOURCE_SIRI
+            platform = v.platform
+        else:
+            stop_dep = o.pt_departure_at
+            realtime = False
+            arrival = o.arrival_at
+            source = SOURCE_NAVITIA
+            platform = None
+        leave_at = compute_leave_at(stop_dep, walk_s, margin_min)
+        if leave_at < now:
+            continue
+        out.append(
+            PlannedDeparture(
+                line=o.line_code or (info.code if info else ""),
+                mode=o.mode if o.mode != "other" or not info else info.mode,
+                direction=o.direction,
+                stop_departure=stop_dep,
+                leave_at=leave_at,
+                realtime=realtime,
+                walk_min=math.ceil(walk_s / 60),
+                source=source,
+                line_id=oid,
+                line_color=o.color or (info.color if info else None),
+                line_text_color=o.text_color or (info.text_color if info else None),
+                arrival_at=arrival,
+                platform=platform,
             )
         )
     out.sort(key=lambda d: d.leave_at)

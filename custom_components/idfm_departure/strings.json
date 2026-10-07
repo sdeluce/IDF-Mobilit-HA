@@ -57,6 +57,19 @@
         "data": {
           "api_key": "PRIM API key"
         }
+      },
+      "stop_destination": {
+        "title": "Destination station (optional)",
+        "description": "Optional. Enter a destination station to keep only the trains that actually reach it (useful for RER branches) and to compute the arrival time. Leave empty to skip.",
+        "data": {
+          "query": "Destination station (empty = none)"
+        }
+      },
+      "stop_destination_select": {
+        "title": "Select the destination station",
+        "data": {
+          "stop_dest_id": "Destination station"
+        }
       }
     },
     "error": {
@@ -81,7 +94,9 @@
           "journey_refresh_min": "Journey refresh (min)",
           "active_start": "Active from",
           "active_end": "Active until",
-          "departures_count": "Number of departures"
+          "departures_count": "Number of departures",
+          "direct_only": "Direct trains only (no transfer)",
+          "clear_destination": "Clear the destination station"
         },
         "description": "The PRIM quota is 1000 calls/day per API key. Estimated calls = active window / refresh interval, summed over all entries sharing this key; it must stay under 900."
       }
@@ -106,6 +121,9 @@
       },
       "walk_time": {
         "name": "Walking time"
+      },
+      "arrival_at": {
+        "name": "Arrival at destination"
       }
     },
     "binary_sensor": {

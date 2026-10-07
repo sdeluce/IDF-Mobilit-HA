@@ -1,0 +1,62 @@
+{
+ "Siri": {
+  "ServiceDelivery": {
+   "StopMonitoringDelivery": [
+    {
+     "MonitoredStopVisit": [
+      {
+       "MonitoringRef": {
+        "value": "STIF:StopPoint:Q:22113:"
+       },
+       "MonitoredVehicleJourney": {
+        "LineRef": {
+         "value": "STIF:Line::C01742:"
+        },
+        "PublishedLineName": "RER A",
+        "DestinationName": "Marne-la-Vallée Chessy",
+        "MonitoredCall": {
+         "AimedDepartureTime": "2026-10-07T07:10:00.000Z",
+         "DeparturePlatformName": [{"value": "2"}],
+         "ExpectedDepartureTime": "2026-10-07T07:10:00.000Z"
+        }
+       }
+      },
+      {
+       "MonitoringRef": {
+        "value": "STIF:StopPoint:Q:22113:"
+       },
+       "MonitoredVehicleJourney": {
+        "LineRef": {
+         "value": "STIF:Line::C01742:"
+        },
+        "PublishedLineName": "RER A",
+        "DestinationName": "Boissy-Saint-Léger",
+        "MonitoredCall": {
+         "AimedDepartureTime": "2026-10-07T07:15:00.000Z",
+         "ExpectedDepartureTime": "2026-10-07T07:15:00.000Z"
+        }
+       }
+      },
+      {
+       "MonitoringRef": {
+        "value": "STIF:StopPoint:Q:22113:"
+       },
+       "MonitoredVehicleJourney": {
+        "LineRef": {
+         "value": "STIF:Line::C01742:"
+        },
+        "PublishedLineName": "RER A",
+        "DestinationName": "Marne-la-Vallée Chessy",
+        "MonitoredCall": {
+         "AimedDepartureTime": "2026-10-07T07:20:00.000Z",
+         "ArrivalPlatformName": "C",
+         "ExpectedDepartureTime": "2026-10-07T07:24:00.000Z"
+        }
+       }
+      }
+     ]
+    }
+   ]
+  }
+ }
+}

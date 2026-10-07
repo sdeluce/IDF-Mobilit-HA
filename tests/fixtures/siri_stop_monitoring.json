@@ -18,6 +18,7 @@
                 "MonitoredCall": {
                   "StopPointName": [{"value": "Châtelet-Les Halles"}],
                   "AimedDepartureTime": "2026-10-07T07:18:00.000Z",
+                  "DeparturePlatformName": [{"value": "2"}],
                   "ExpectedDepartureTime": "2026-10-07T07:20:00.000Z"
                 }
               }
@@ -31,6 +32,7 @@
                 "DestinationName": "Marne-la-Vallée Chessy",
                 "MonitoredCall": {
                   "AimedDepartureTime": "2026-10-07T09:33:00.000+02:00",
+                  "ArrivalPlatformName": " B ",
                   "ExpectedDepartureTime": "2026-10-07T09:35:00.000+02:00"
                 }
               }

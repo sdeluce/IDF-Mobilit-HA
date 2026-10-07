@@ -47,6 +47,10 @@ En dehors de la plage d'activité aucune requête n'est émise.
 3. **Options** (roue dentée de l'entrée) : marge (défaut 3 min), temps de marche forcé (vide =
    automatique), intervalle de rafraîchissement (60–3600 s), rafraîchissement du trajet (défaut 10 min),
    plage d'activité (05:30 → 01:00), nombre de départs (défaut 3).
+4. **Station de destination (optionnelle)** : en mode « Un arrêt », vous pouvez indiquer une station de
+   destination ; seuls les passages desservant cette station sont conservés, et l'heure d'arrivée
+   (`arrival_at`, `destination_name`) est exposée dans les attributs du capteur `leave_at` et affichée
+   par la carte. Si le filtre ne peut pas être appliqué, `destination_filter_active` vaut `false`.
 
 ## Entités
 
@@ -103,6 +107,11 @@ L'intégration fournit une carte personnalisée `idfm-departure-card` : pastille
 gros compteur « Partir dans N min », mode et heure de départ, et météo optionnelle. Les minutes sont
 recalculées côté navigateur toutes les 10 secondes.
 
+Si une station de destination est configurée, la ligne du bas devient « Métro à 15:30 → La Défense 15:52 ».
+Sur une carte étroite, l'arrivée passe sur une ligne séparée (« Arrivée à La Défense : 15:52 »). Si le
+filtre de destination n'a pas pu être appliqué (`destination_filter_active: false`), un petit symbole ⚠
+« filtre destination indisponible » s'affiche.
+
 La carte est chargée automatiquement par l'intégration (servie sur
 `/idfm_departure_static/idfm-departure-card.js`). Si elle n'apparaît pas dans le sélecteur de cartes,
 ajoutez-la manuellement comme ressource JavaScript (module) : *Paramètres > Tableaux de bord >
@@ -122,6 +131,35 @@ show_next: true
 | `title` | non | nom de l'arrêt | Remplace le nom de l'arrêt |
 | `show_next` | non | `false` | Affiche « Puis : 15:34, 15:38 » (départs suivants) |
 | `show_clock` | non | `true` | Affiche l'heure courante en haut à droite |
+| `show_arrival` | non | `true` | Affiche l'arrivée à la station de destination (si configurée) |
+
+### Carte « Départs détaillés »
+
+La carte `idfm-departure-list-card` (« IDFM Départs détaillés », chargée par le même fichier) affiche un
+tableau des prochains départs du capteur `leave_at` : pastille de ligne, direction, heure pour partir
+(« Partir », avec « dans N min » ou « maintenant »), heure du train en gare (« Gare », avec un point vert
+si le temps réel est disponible), voie (« Voie », « – » si inconnue) et heure d'arrivée (« Arrivée »,
+affichée seulement si au moins un départ en a une). Les départs dont l'heure pour partir est passée
+disparaissent automatiquement (recalcul toutes les 10 secondes). La carte est adaptative : la direction
+est masquée sur largeur moyenne, et sur une carte étroite (moins de 360 px) chaque départ passe sur deux
+lignes.
+
+```yaml
+type: custom:idfm-departure-list-card
+entity: sensor.auber_leave_at
+title: RER A depuis Auber
+count: 5
+show_arrival: true
+show_direction: true
+```
+
+| Option | Obligatoire | Défaut | Description |
+|---|---|---|---|
+| `entity` | oui | | Capteur `leave_at` de l'intégration |
+| `title` | non | nom de l'arrêt | Remplace le nom de l'arrêt |
+| `count` | non | `5` | Nombre de départs affichés (1 à 10) |
+| `show_arrival` | non | `true` | Affiche la colonne « Arrivée » (si des heures d'arrivée existent) |
+| `show_direction` | non | `true` | Affiche la direction du train |
 
 ## Limites
 

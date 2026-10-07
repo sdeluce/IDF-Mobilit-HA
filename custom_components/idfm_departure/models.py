@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 
@@ -42,6 +42,8 @@ class StopVisit:
     stop_ref: str | None
     departure_at: datetime
     realtime: bool
+    aimed_departure_at: datetime | None = None
+    platform: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +61,8 @@ class JourneyOption:
     arrival_at: datetime | None
     color: str | None = None
     text_color: str | None = None
+    base_pt_departure_at: datetime | None = None
+    nb_transfers: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,6 +80,8 @@ class PlannedDeparture:
     line_id: str | None = None
     line_color: str | None = None
     line_text_color: str | None = None
+    arrival_at: datetime | None = None
+    platform: str | None = None
 
     def as_attr(self) -> dict[str, Any]:
         """Return a JSON-friendly attribute dict."""
@@ -90,6 +96,12 @@ class PlannedDeparture:
             "line_id": self.line_id,
             "line_color": self.line_color,
             "line_text_color": self.line_text_color,
+            "arrival_at": (
+                self.arrival_at.astimezone(UTC).isoformat()
+                if self.arrival_at
+                else None
+            ),
+            "platform": self.platform,
         }
 
 

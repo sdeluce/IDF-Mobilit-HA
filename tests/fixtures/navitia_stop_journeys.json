@@ -1,0 +1,112 @@
+{
+ "journeys": [
+  {
+   "duration": 1800,
+   "nb_transfers": 0,
+   "arrival_date_time": "20261007T094000",
+   "sections": [
+    {
+     "type": "public_transport",
+     "departure_date_time": "20261007T091000",
+     "base_departure_date_time": "20261007T091000",
+     "arrival_date_time": "20261007T094000",
+     "from": {
+      "id": "stop_point:IDFM:22113",
+      "name": "Châtelet-Les Halles",
+      "embedded_type": "stop_point",
+      "stop_point": {
+       "id": "stop_point:IDFM:22113",
+       "name": "Châtelet-Les Halles"
+      }
+     },
+     "display_informations": {
+      "code": "A",
+      "commercial_mode": "RER",
+      "physical_mode": "Train RER",
+      "direction": "Marne-la-Vallée Chessy",
+      "color": "e2231a",
+      "text_color": "FFFFFF"
+     },
+     "links": [
+      {
+       "type": "line",
+       "id": "line:IDFM:C01742"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "duration": 1800,
+   "nb_transfers": 0,
+   "arrival_date_time": "20261007T095000",
+   "sections": [
+    {
+     "type": "public_transport",
+     "departure_date_time": "20261007T092000",
+     "base_departure_date_time": "20261007T092000",
+     "arrival_date_time": "20261007T095000",
+     "from": {
+      "id": "stop_point:IDFM:22113",
+      "name": "Châtelet-Les Halles",
+      "embedded_type": "stop_point",
+      "stop_point": {
+       "id": "stop_point:IDFM:22113",
+       "name": "Châtelet-Les Halles"
+      }
+     },
+     "display_informations": {
+      "code": "A",
+      "commercial_mode": "RER",
+      "physical_mode": "Train RER",
+      "direction": "Marne-la-Vallée Chessy",
+      "color": "e2231a",
+      "text_color": "FFFFFF"
+     },
+     "links": [
+      {
+       "type": "line",
+       "id": "line:IDFM:C01742"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "duration": 1800,
+   "nb_transfers": 1,
+   "arrival_date_time": "20261007T100000",
+   "sections": [
+    {
+     "type": "public_transport",
+     "departure_date_time": "20261007T093000",
+     "base_departure_date_time": "20261007T093000",
+     "arrival_date_time": "20261007T100000",
+     "from": {
+      "id": "stop_point:IDFM:22113",
+      "name": "Châtelet-Les Halles",
+      "embedded_type": "stop_point",
+      "stop_point": {
+       "id": "stop_point:IDFM:22113",
+       "name": "Châtelet-Les Halles"
+      }
+     },
+     "display_informations": {
+      "code": "A",
+      "commercial_mode": "RER",
+      "physical_mode": "Train RER",
+      "direction": "Marne-la-Vallée Chessy",
+      "color": "e2231a",
+      "text_color": "FFFFFF"
+     },
+     "links": [
+      {
+       "type": "line",
+       "id": "line:IDFM:C01742"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}
