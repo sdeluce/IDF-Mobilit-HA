@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect x="16" y="16" width="480" height="480" rx="110" fill="#1F5FAD"/>
+  <!-- train front -->
+  <rect x="136" y="96" width="240" height="268" rx="56" fill="#fff"/>
+  <rect x="166" y="132" width="180" height="104" rx="20" fill="#1F5FAD"/>
+  <circle cx="190" cy="300" r="20" fill="#1F5FAD"/>
+  <circle cx="322" cy="300" r="20" fill="#1F5FAD"/>
+  <path d="M176 364 L136 430 M336 364 L376 430" stroke="#fff" stroke-width="26" stroke-linecap="round"/>
+  <!-- clock badge -->
+  <circle cx="392" cy="392" r="92" fill="#F2A900" stroke="#1F5FAD" stroke-width="18"/>
+  <path d="M392 338 V392 L428 414" stroke="#fff" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>
