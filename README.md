@@ -132,6 +132,7 @@ show_next: true
 | `show_next` | non | `false` | Affiche « Puis : 15:34, 15:38 » (départs suivants) |
 | `show_clock` | non | `true` | Affiche l'heure courante en haut à droite |
 | `show_arrival` | non | `true` | Affiche l'arrivée à la station de destination (si configurée) |
+| `show_platform` | non | `true` | Affiche la voie à côté de l'heure de départ (si connue) |
 
 ### Carte « Départs détaillés »
 
@@ -160,6 +161,73 @@ show_direction: true
 | `count` | non | `5` | Nombre de départs affichés (1 à 10) |
 | `show_arrival` | non | `true` | Affiche la colonne « Arrivée » (si des heures d'arrivée existent) |
 | `show_direction` | non | `true` | Affiche la direction du train |
+
+### Personnaliser les tailles
+
+**Taille de la carte dans le tableau de bord.** Dans une vue « Sections », ouvrez l'onglet *Disposition*
+de la carte pour régler le nombre de colonnes et de lignes (`grid_options` : `columns`, `rows`). La carte
+remplit sa cellule et ses textes s'adaptent à sa largeur. Dans une vue « Panneau » (une seule carte
+plein écran), la carte occupe tout l'espace ; utilisez `scale` ou `card_height` pour ajuster.
+
+La carte simple adapte aussi ses textes à la hauteur de sa cellule. Quand la cellule est très large et peu haute
+(ex. 12 colonnes × 2 à 4 lignes), elle passe en disposition horizontale (minutes à gauche, infos à droite) ; l'option
+`layout: auto | tall | wide` (défaut `auto`) permet de forcer l'une ou l'autre.
+
+**Options de taille** (les deux cartes, aussi présentes dans l'éditeur visuel) :
+
+| Option | Cartes | Défaut | Description |
+|---|---|---|---|
+| `scale` | les deux | `1` | Échelle globale, de `0.5` à `3`, appliquée à toutes les tailles |
+| `minutes_size` | simple | auto | Taille du gros compteur « N min » |
+| `header_size` | les deux | auto | Taille du nom de l'arrêt / titre |
+| `badge_size` | les deux | auto | Taille de la pastille de ligne |
+| `footer_size` | simple | auto | Taille de la ligne du bas (mode, heure, arrivée) |
+| `row_size` | liste | auto | Taille du texte principal des lignes (direction) |
+| `time_size` | liste | auto | Taille des heures (« Partir », « Gare », « Arrivée ») |
+| `platform_size` | les deux | auto | Taille de la voie |
+| `card_height` | les deux | non défini | Hauteur de la carte, ex. `100%` ou `300px` |
+
+Les tailles `*_size` et `card_height` acceptent un nombre (pixels) ou une chaîne avec unité (`120px`,
+`20cqi`, `2em`; unités `px`, `em`, `rem`, `%`, `cqi`, `vw`, `vh`). Une valeur invalide est ignorée (avertissement
+dans la console du navigateur). Par défaut les tailles suivent la largeur de la carte (unités `cqi`).
+
+```yaml
+type: custom:idfm-departure-card
+entity: sensor.chatelet_leave_at
+scale: 1.3
+minutes_size: 140
+```
+
+**Variables CSS.** Chaque taille est une variable CSS (valeur finale = variable × `--idfm-scale`) :
+
+- carte simple : `--idfm-scale`, `--idfm-header-size`, `--idfm-clock-size`, `--idfm-badge-size`,
+  `--idfm-label-size` (« Partir dans »), `--idfm-minutes-size`, `--idfm-minutes-small-size` (texte « Aucun
+  départ » / « Partir maintenant ! »), `--idfm-footer-size`, `--idfm-next-size` (« Puis »),
+  `--idfm-weather-icon-size`, `--idfm-padding`, `--idfm-card-height` ;
+- carte liste : `--idfm-scale`, `--idfm-header-size`, `--idfm-clock-size`, `--idfm-badge-size`,
+  `--idfm-row-size`, `--idfm-time-size`, `--idfm-platform-size`, `--idfm-col-header-size`,
+  `--idfm-sub-size` (« dans N min », marche), `--idfm-padding`, `--idfm-card-height`.
+
+Avec card-mod :
+
+```yaml
+type: custom:idfm-departure-card
+entity: sensor.chatelet_leave_at
+card_mod:
+  style: |
+    ha-card { --idfm-minutes-size: 120px; }
+```
+
+Dans un thème (appliqué à toutes les cartes) :
+
+```yaml
+mon-theme:
+  idfm-minutes-size: 120px
+```
+
+Les variables d'un thème sont des variables `--idfm-...` (HA ajoute le préfixe `--`). Les options définies
+dans la configuration de la carte (`minutes_size`, `scale`...) sont posées en ligne sur la carte et
+**l'emportent** sur les variables du thème ou de card-mod ; retirez l'option pour laisser le thème décider.
 
 ## Limites
 

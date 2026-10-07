@@ -9,9 +9,9 @@
     en: { metro: "Metro", rer: "RER", train: "Train", tram: "Tram", bus: "Bus", other: "Departure" },
   };
   const TEXTS = {
-    fr: { leaveIn: "Partir dans", now: "Partir maintenant !", none: "Aucun départ", at: "à", then: "Puis :", min: "min",
+    fr: { platform: "voie", leaveIn: "Partir dans", now: "Partir maintenant !", none: "Aucun départ", at: "à", then: "Puis :", min: "min",
       arrivalAt: (n, t) => `Arrivée à ${n} : ${t}`, noFilter: "filtre destination indisponible" },
-    en: { leaveIn: "Leave in", now: "Leave now!", none: "No departure", at: "at", then: "Then:", min: "min",
+    en: { platform: "platform", leaveIn: "Leave in", now: "Leave now!", none: "No departure", at: "at", then: "Then:", min: "min",
       arrivalAt: (n, t) => `Arrives ${n} at ${t}`, noFilter: "destination filter unavailable" },
   };
   const WEATHER_ICONS = {
@@ -40,33 +40,80 @@
     return n;
   };
 
+  const SCALE_FIELD = { name: "scale", selector: { number: { min: 0.5, max: 3, step: 0.1, mode: "box" } } };
+  const SIZE_LABELS = {
+    scale: "Échelle globale (0.5 à 3, défaut 1)", card_height: "Hauteur de la carte (ex. 100% ou 300px)",
+    minutes_size: "Taille des minutes (px ou 20cqi, 2em...)", header_size: "Taille de l'en-tête",
+    badge_size: "Taille de la pastille", footer_size: "Taille de la ligne du bas", row_size: "Taille du texte des lignes",
+    time_size: "Taille des heures", platform_size: "Taille de la voie",
+  };
+  const SIZE_RE = /^\d+(\.\d+)?(px|em|rem|%|cqi|vw|vh)$/;
+  // Config option -> CSS custom property set inline on ha-card (inline wins over theme / card-mod).
+  const SIZE_VARS = {
+    minutes_size: "--idfm-minutes-size", header_size: "--idfm-header-size", badge_size: "--idfm-badge-size",
+    footer_size: "--idfm-footer-size", row_size: "--idfm-row-size", time_size: "--idfm-time-size",
+    platform_size: "--idfm-platform-size", card_height: "--idfm-card-height",
+  };
+
   const STYLE = `
-    :host { display: block; }
-    ha-card, .card { display: block; container-type: inline-size; height: 100%; box-sizing: border-box;
+    :host { display: block; height: 100%; }
+    ha-card, .card { display: block; container-type: inline-size; height: var(--idfm-card-height, 100%); box-sizing: border-box;
       background: var(--card-background-color, #fff); color: var(--primary-text-color, #212121);
-      border-radius: var(--ha-card-border-radius, 16px); overflow: hidden; }
+      border-radius: var(--ha-card-border-radius, 16px); overflow: hidden;
+      --d-pad: clamp(10px, 4cqi, 22px); --d-badge: clamp(14px, 6cqi, 26px); --d-header: clamp(15px, 6cqi, 26px);
+      --d-clock: clamp(14px, 5.5cqi, 24px); --d-label: clamp(11px, 3.8cqi, 16px); --d-minutes: clamp(36px, 22cqi, 110px);
+      --d-small: clamp(22px, 9cqi, 48px); --d-next: clamp(11px, 3.8cqi, 15px); --d-footer: clamp(12px, 4.6cqi, 20px); }
+    /* Probe: card taken out of flow to tell whether the host has a definite (grid-imposed) height. */
+    .card[data-probe] { position: absolute !important; height: 0 !important; width: 100% !important; visibility: hidden; }
+    /* Fixed-height context (sections grid, panel, card_height): 2D container, sizes also capped by height. */
+    .card[data-fixed] { container-type: size; }
+    .card[data-fixed][data-layout="tall"] {
+      --d-pad: min(clamp(10px, 4cqi, 22px), 6cqh); --d-badge: min(clamp(14px, 6cqi, 26px), 6.5cqh);
+      --d-header: min(clamp(15px, 6cqi, 26px), 8.5cqh); --d-clock: min(clamp(14px, 5.5cqi, 24px), 8cqh);
+      --d-label: min(clamp(11px, 3.8cqi, 16px), 6.5cqh); --d-minutes: min(clamp(36px, 22cqi, 110px), 30cqh);
+      --d-small: min(clamp(22px, 9cqi, 48px), 14cqh); --d-next: min(clamp(11px, 3.8cqi, 15px), 6.5cqh);
+      --d-footer: min(clamp(12px, 4.6cqi, 20px), 8cqh); }
+    .card[data-fixed][data-layout="wide"] {
+      --d-pad: min(clamp(10px, 3cqi, 22px), 8cqh); --d-badge: min(12cqh, 28px); --d-header: min(13cqh, 28px);
+      --d-clock: min(11cqh, 24px); --d-label: min(9cqh, 18px); --d-minutes: min(52cqh, 16cqi);
+      --d-small: min(24cqh, 6cqi); --d-next: min(9cqh, 16px); --d-footer: min(11cqh, 22px); }
     .wrap { display: flex; flex-direction: column; height: 100%; box-sizing: border-box;
-      padding: clamp(10px, 4cqi, 22px); gap: 2px; }
+      padding: calc(var(--idfm-padding, var(--d-pad)) * var(--idfm-scale, 1)); gap: 2px; }
+    .left { display: contents; }
+    .card[data-layout="wide"] .wrap { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+      grid-template-rows: auto 1fr auto auto; column-gap: calc(var(--d-pad) * 1.5); }
+    .card[data-layout="wide"] .left { display: flex; flex-direction: column; justify-content: center;
+      grid-column: 1; grid-row: 1 / -1; min-width: 0; }
+    .card[data-layout="wide"] .left .label { margin-top: 0; }
+    .card[data-layout="wide"] .left .big { flex: none; line-height: 1; }
+    .card[data-layout="wide"] .top { grid-column: 2; grid-row: 1; }
+    .card[data-layout="wide"] .next { grid-column: 2; grid-row: 2; align-self: end; min-height: 0; }
+    .card[data-layout="wide"] .bottom { grid-column: 2; grid-row: 3; }
+    .card[data-layout="wide"] .arr-line { grid-column: 2; grid-row: 4; }
     .top { display: flex; align-items: center; gap: 10px; }
     .badge { min-width: 1.9em; padding: 0 .35em; height: 1.9em; box-sizing: border-box; border-radius: 8px;
       display: inline-flex; align-items: center; justify-content: center; font-weight: 700;
-      font-size: clamp(14px, 6cqi, 26px); flex: none; }
+      font-size: calc(var(--idfm-badge-size, var(--d-badge)) * var(--idfm-scale, 1)); flex: none; }
     .badge[hidden] { display: none; }
-    .stop { flex: 1; min-width: 0; font-weight: 700; font-size: clamp(15px, 6cqi, 26px);
+    .stop { flex: 1; min-width: 0; font-weight: 700; font-size: calc(var(--idfm-header-size, var(--d-header)) * var(--idfm-scale, 1));
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .clock { font-size: clamp(14px, 5.5cqi, 24px); color: var(--primary-text-color, #212121);
+    .clock { font-size: calc(var(--idfm-clock-size, var(--d-clock)) * var(--idfm-scale, 1)); color: var(--primary-text-color, #212121);
       font-variant-numeric: tabular-nums; }
-    .label { font-size: clamp(11px, 3.8cqi, 16px); color: var(--secondary-text-color, #727272); margin-top: 4px; }
-    .big { font-weight: 800; line-height: 1.05; font-size: clamp(36px, 22cqi, 110px);
+    .label { font-size: calc(var(--idfm-label-size, var(--d-label)) * var(--idfm-scale, 1)); color: var(--secondary-text-color, #727272); margin-top: 4px; }
+    .big { font-weight: 800; line-height: 1.05; font-size: calc(var(--idfm-minutes-size, var(--d-minutes)) * var(--idfm-scale, 1));
       font-variant-numeric: tabular-nums; flex: 1; display: flex; align-items: center; white-space: nowrap; }
-    .big.small { font-size: clamp(22px, 9cqi, 48px); white-space: normal; }
+    .big.small { font-size: calc(var(--idfm-minutes-small-size, var(--d-small)) * var(--idfm-scale, 1)); white-space: normal; }
     .big.alert { color: var(--error-color, #db4437); }
-    .next { font-size: clamp(11px, 3.8cqi, 15px); color: var(--secondary-text-color, #727272); min-height: 1.2em; }
+    .next { font-size: calc(var(--idfm-next-size, var(--d-next)) * var(--idfm-scale, 1)); color: var(--secondary-text-color, #727272); min-height: 1.2em; }
     .bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px;
-      font-size: clamp(12px, 4.6cqi, 20px); }
+      font-size: calc(var(--idfm-footer-size, var(--d-footer)) * var(--idfm-scale, 1)); }
     .bottom-wrap { display: flex; flex-direction: column; gap: 2px; }
+    .plat { flex: none; white-space: nowrap; }
+    .plat[hidden] { display: none; }
+    .plat b { font-weight: 800; line-height: 1;
+      font-size: calc(var(--idfm-platform-size, calc(var(--idfm-footer-size, var(--d-footer)) * 1.25)) * var(--idfm-scale, 1)); }
     .dep-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .arr-line { font-size: clamp(11px, 3.8cqi, 15px); color: var(--secondary-text-color, #727272);
+    .arr-line { font-size: calc(var(--idfm-next-size, var(--d-next)) * var(--idfm-scale, 1)); color: var(--secondary-text-color, #727272);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: none; }
     .arr-inline[hidden], .arr-line[hidden], .warn[hidden] { display: none; }
     .warn { cursor: help; flex: none; font-size: .85em; opacity: .8; }
@@ -80,7 +127,7 @@
     .rt[hidden] { display: none; }
     .weather { display: flex; align-items: center; gap: 4px; color: var(--secondary-text-color, #727272); }
     .weather[hidden] { display: none; }
-    .weather ha-icon { --mdc-icon-size: 1.4em; }
+    .weather ha-icon { --mdc-icon-size: calc(var(--idfm-weather-icon-size, 1.4em) * var(--idfm-scale, 1)); }
     @keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .3; transform: scale(.7); } }
     @media (prefers-reduced-motion: reduce) { .rt { animation: none; } }
   `;
@@ -105,11 +152,20 @@
           { name: "show_next", selector: { boolean: {} } },
           { name: "show_clock", selector: { boolean: {} } },
           { name: "show_arrival", selector: { boolean: {} } },
+          { name: "show_platform", selector: { boolean: {} } },
+          { name: "layout", selector: { select: { mode: "dropdown", options: [
+            { value: "auto", label: "Auto" }, { value: "tall", label: "Vertical" }, { value: "wide", label: "Horizontal (large et bas)" }] } } },
+          SCALE_FIELD, { name: "minutes_size", selector: { text: {} } },
+          { name: "header_size", selector: { text: {} } }, { name: "badge_size", selector: { text: {} } },
+          { name: "footer_size", selector: { text: {} } }, { name: "platform_size", selector: { text: {} } },
+          { name: "card_height", selector: { text: {} } },
         ],
         computeLabel: (s) => ({
+          ...SIZE_LABELS,
+          show_platform: "Afficher la voie",
           entity: "Entité (capteur leave_at)", weather_entity: "Météo (optionnel)",
           title: "Titre (remplace l'arrêt)", show_next: "Afficher les départs suivants",
-          show_clock: "Afficher l'heure", show_arrival: "Afficher l'arrivée à destination",
+          show_clock: "Afficher l'heure", layout: "Disposition (auto, vertical, horizontal)", show_arrival: "Afficher l'arrivée à destination",
         }[s.name] || s.name),
       };
     }
@@ -124,7 +180,7 @@
 
     setConfig(config) {
       if (!config || !config.entity) throw new Error("L'option 'entity' est requise");
-      this._config = { show_next: false, show_clock: true, show_arrival: true, ...config };
+      this._config = { show_next: false, show_clock: true, show_arrival: true, show_platform: true, ...config };
       this._render();
     }
 
@@ -139,14 +195,65 @@
       this._render();
     }
 
+    _applySizes() {
+      const card = this._card;
+      const c = this._config;
+      if (!card || !c) return;
+      const set = (prop, v, key) => {
+        if (v === undefined || v === null || v === "") { card.style.removeProperty(prop); return; }
+        let out = null;
+        if (typeof v === "number" && Number.isFinite(v) && v > 0) out = `${v}px`;
+        else if (typeof v === "string" && SIZE_RE.test(v.trim())) out = v.trim();
+        if (out === null) {
+          console.warn(`idfm-departure-card: valeur ignorée pour '${key}': ${JSON.stringify(v)}`);
+          card.style.removeProperty(prop);
+        } else card.style.setProperty(prop, out);
+      };
+      const sc = Number(c.scale);
+      if (c.scale === undefined || c.scale === null || c.scale === "") card.style.removeProperty("--idfm-scale");
+      else if (Number.isFinite(sc) && sc >= 0.5 && sc <= 3) card.style.setProperty("--idfm-scale", String(sc));
+      else {
+        console.warn(`idfm-departure-card: 'scale' doit être entre 0.5 et 3: ${JSON.stringify(c.scale)}`);
+        card.style.removeProperty("--idfm-scale");
+      }
+      for (const [key, prop] of Object.entries(SIZE_VARS)) set(prop, c[key], key);
+    }
+
     getCardSize() { return 3; }
     getGridOptions() { return { columns: 6, rows: 3, min_rows: 2 }; }
 
+    _applyLayout() {
+      const card = this._card;
+      const c = this._config;
+      if (!card || !c || !this.isConnected) return;
+      const ch = typeof c.card_height === "string" ? c.card_height.trim() : c.card_height;
+      const cfgFixed = (typeof ch === "number" && ch > 0) || (typeof ch === "string" && SIZE_RE.test(ch) && !ch.endsWith("%"));
+      // Probe: with the card out of flow, the host keeps a non-zero height only if its parent imposes one.
+      card.setAttribute("data-probe", "");
+      const hostH = this.clientHeight;
+      card.removeAttribute("data-probe");
+      const fixed = cfgFixed || hostH >= 40;
+      const w = this.clientWidth;
+      const h = cfgFixed ? card.clientHeight : hostH;
+      let layout = "tall";
+      if (c.layout === "wide") layout = "wide";
+      else if (c.layout !== "tall" && fixed && h > 0 && w / h >= 3.5) layout = "wide";
+      const setAttr = (n, v) => { if (v === null) card.removeAttribute(n); else if (card.getAttribute(n) !== v) card.setAttribute(n, v); };
+      setAttr("data-fixed", fixed ? "" : null);
+      setAttr("data-layout", layout);
+    }
+
     connectedCallback() {
       this._render();
+      if (typeof ResizeObserver !== "undefined" && !this._ro) {
+        this._ro = new ResizeObserver(() => this._applyLayout());
+        this._ro.observe(this);
+      }
+      this._applyLayout();
       if (!this._timer) this._timer = setInterval(() => this._render(), 10000);
     }
     disconnectedCallback() {
+      if (this._ro) { this._ro.disconnect(); this._ro = null; }
       if (this._timer) { clearInterval(this._timer); this._timer = null; }
     }
 
@@ -175,6 +282,7 @@
       style.textContent = STYLE;
       const card = document.createElement("ha-card");
       card.className = "card";
+      this._card = card;
       const wrap = el("div", "wrap");
       const top = el("div", "top");
       this._badge = el("span", "badge");
@@ -189,10 +297,15 @@
       const dep = el("div", "dep");
       this._depText = el("span", "dep-text");
       this._arrInline = el("span", "arr-inline dep-text");
+      this._plat = el("span", "plat");
+      this._plat.hidden = true;
+      this._platLbl = el("span");
+      this._platNum = el("b");
+      this._plat.append(this._platLbl, this._platNum);
       this._rt = el("span", "rt");
       this._warn = el("span", "warn", "\u26A0");
       this._warn.hidden = true;
-      dep.append(this._depText, this._arrInline, this._rt, this._warn);
+      dep.append(this._depText, this._plat, this._arrInline, this._rt, this._warn);
       this._weather = el("div", "weather");
       this._wIcon = document.createElement("ha-icon");
       this._wTemp = el("span");
@@ -201,7 +314,9 @@
       this._arrLine = el("div", "arr-line");
       this._arrLine.hidden = true;
       this._arrInline.hidden = true;
-      wrap.append(top, this._label, this._big, this._next, bottom, this._arrLine);
+      const left = el("div", "left");
+      left.append(this._label, this._big);
+      wrap.append(top, left, this._next, bottom, this._arrLine);
       card.append(wrap);
       root.replaceChildren(style, card);
       this._built = true;
@@ -212,7 +327,7 @@
       const a = st.attributes || {};
       let info = { line: a.line, line_color: a.line_color, line_text_color: a.line_text_color,
         mode: a.mode, stop_departure: a.stop_departure, realtime: a.realtime,
-        arrival_at: a.arrival_at };
+        arrival_at: a.arrival_at, platform: a.platform };
       let leaveAt = INVALID.has(st.state) ? NaN : Date.parse(st.state);
       const now = Date.now();
       const list = Array.isArray(a.departures) ? a.departures : [];
@@ -225,7 +340,7 @@
           leaveAt = Date.parse(next.leave_at);
           info = { line: next.line, line_color: next.line_color, line_text_color: next.line_text_color,
             mode: next.mode, stop_departure: next.stop_departure, realtime: next.realtime,
-            arrival_at: next.arrival_at };
+            arrival_at: next.arrival_at, platform: next.platform };
         }
       }
       return { leaveAt, info, list };
@@ -234,6 +349,8 @@
     _render() {
       if (!this._config) return;
       if (!this._built) this._build();
+      this._applySizes();
+      this._applyLayout();
       const c = this._config;
       const hass = this._hass;
       const lang = this._lang();
@@ -251,6 +368,7 @@
         this._big.textContent = T.none;
         this._next.textContent = "";
         this._depText.textContent = "";
+        this._plat.hidden = true;
         this._rt.hidden = true;
         this._arrInline.hidden = true;
         this._arrLine.hidden = true;
@@ -293,6 +411,16 @@
       const depTime = valid ? this._fmt(info.stop_departure) : "";
       const modeLabel = MODE_LABELS[lang][mode];
       this._depText.textContent = depTime ? `${modeLabel} ${T.at} ${depTime}` : "";
+      const plat = info.platform === undefined || info.platform === null ? "" : String(info.platform).trim();
+      if (depTime && plat && c.show_platform !== false) {
+        this._platLbl.textContent = ` \u00B7 ${T.platform} `;
+        this._platNum.textContent = plat;
+        this._plat.hidden = false;
+      } else {
+        this._platLbl.textContent = "";
+        this._platNum.textContent = "";
+        this._plat.hidden = true;
+      }
       this._rt.hidden = !(valid && info.realtime === true && depTime);
 
       const destName = typeof a.destination_name === "string" ? a.destination_name : "";
@@ -345,15 +473,15 @@
   };
   const LIST_STYLE = `
     :host { display: block; }
-    ha-card, .card { display: block; container-type: inline-size; height: 100%; box-sizing: border-box;
+    ha-card, .card { display: block; container-type: inline-size; height: var(--idfm-card-height, 100%); box-sizing: border-box;
       background: var(--card-background-color, #fff); color: var(--primary-text-color, #212121);
       border-radius: var(--ha-card-border-radius, 16px); overflow: hidden; }
-    .wrap { display: flex; flex-direction: column; box-sizing: border-box; padding: clamp(10px, 3cqi, 20px); gap: 6px; }
+    .wrap { display: flex; flex-direction: column; box-sizing: border-box; padding: calc(var(--idfm-padding, clamp(10px, 3cqi, 20px)) * var(--idfm-scale, 1)); gap: 6px; }
     .head { display: flex; align-items: baseline; gap: 10px; }
-    .title { flex: 1; min-width: 0; font-weight: 700; font-size: clamp(15px, 4.5cqi, 24px);
+    .title { flex: 1; min-width: 0; font-weight: 700; font-size: calc(var(--idfm-header-size, clamp(15px, 4.5cqi, 24px)) * var(--idfm-scale, 1));
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .clock { font-size: clamp(14px, 4cqi, 22px); font-variant-numeric: tabular-nums; }
-    .walk { font-size: 12px; color: var(--secondary-text-color, #727272); min-height: 1em; }
+    .clock { font-size: calc(var(--idfm-clock-size, clamp(14px, 4cqi, 22px)) * var(--idfm-scale, 1)); font-variant-numeric: tabular-nums; }
+    .walk { font-size: calc(var(--idfm-sub-size, 12px) * var(--idfm-scale, 1)); color: var(--secondary-text-color, #727272); min-height: 1em; }
     .walk:empty { display: none; }
     .table { --cols: 48px minmax(0, 1fr) 104px 72px 56px 68px; display: flex; flex-direction: column; }
     .table.noarr { --cols: 48px minmax(0, 1fr) 104px 72px 56px; }
@@ -363,16 +491,16 @@
       color: var(--secondary-text-color, #727272); }
     .table.nodir { --cols: 48px 104px 72px 56px 68px; }
     .table.nodir.noarr { --cols: 48px 104px 72px 56px; }
-    .tr.hd > span { font-size: 11px; text-transform: uppercase; }
+    .tr.hd > span { font-size: calc(var(--idfm-col-header-size, 11px) * var(--idfm-scale, 1)); text-transform: uppercase; }
     .badge { min-width: 2.2em; padding: 0 .35em; height: 2em; box-sizing: border-box; border-radius: 8px;
-      display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; justify-self: start; }
-    .dir { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 15px; }
+      display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: calc(var(--idfm-badge-size, 15px) * var(--idfm-scale, 1)); justify-self: start; }
+    .dir { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: calc(var(--idfm-row-size, 15px) * var(--idfm-scale, 1)); }
     .c { min-width: 0; font-variant-numeric: tabular-nums; display: flex; flex-direction: column; }
-    .v { font-weight: 700; font-size: 16px; }
-    .rel { font-size: 12px; color: var(--secondary-text-color, #727272); }
+    .v { font-weight: 700; font-size: calc(var(--idfm-time-size, 16px) * var(--idfm-scale, 1)); }
+    .rel { font-size: calc(var(--idfm-sub-size, 12px) * var(--idfm-scale, 1)); color: var(--secondary-text-color, #727272); }
     .rel.alert { color: var(--error-color, #db4437); font-weight: 700; }
-    .voie .v { font-size: 22px; font-weight: 800; }
-    .lbl { display: none; font-size: 10px; text-transform: uppercase; color: var(--secondary-text-color, #727272); }
+    .voie .v { font-size: calc(var(--idfm-platform-size, 22px) * var(--idfm-scale, 1)); font-weight: 800; }
+    .lbl { display: none; font-size: calc(var(--idfm-col-header-size, 10px) * var(--idfm-scale, 1)); text-transform: uppercase; color: var(--secondary-text-color, #727272); }
     .rt { width: .55em; height: .55em; border-radius: 50%; background: var(--success-color, #43a047);
       animation: pulse 1.6s ease-in-out infinite; flex: none; }
     .empty { padding: 16px 0; text-align: center; color: var(--secondary-text-color, #727272); }
@@ -397,6 +525,7 @@
   `;
 
   class IdfmDepartureListCard extends IdfmDepartureCard {
+    _applyLayout() {} // list card is auto-height; no 2D layout
     static getConfigForm() {
       return {
         schema: [
@@ -406,8 +535,12 @@
           { name: "count", selector: { number: { min: 1, max: 10, mode: "box" } } },
           { name: "show_arrival", selector: { boolean: {} } },
           { name: "show_direction", selector: { boolean: {} } },
+          SCALE_FIELD, { name: "header_size", selector: { text: {} } }, { name: "badge_size", selector: { text: {} } },
+          { name: "row_size", selector: { text: {} } }, { name: "time_size", selector: { text: {} } },
+          { name: "platform_size", selector: { text: {} } }, { name: "card_height", selector: { text: {} } },
         ],
         computeLabel: (s) => ({
+          ...SIZE_LABELS,
           entity: "Entité (capteur leave_at)", title: "Titre (remplace l'arrêt)",
           count: "Nombre de départs (1-10)", show_arrival: "Afficher l'arrivée",
           show_direction: "Afficher la direction",
@@ -437,6 +570,7 @@
       style.textContent = LIST_STYLE;
       const card = document.createElement("ha-card");
       card.className = "card";
+      this._card = card;
       const wrap = el("div", "wrap");
       const head = el("div", "head");
       this._title = el("span", "title");
@@ -459,6 +593,7 @@
     _render() {
       if (!this._config) return;
       if (!this._built) this._build();
+      this._applySizes();
       const c = this._config;
       const lang = this._lang();
       const T = LIST_TEXTS[lang];
