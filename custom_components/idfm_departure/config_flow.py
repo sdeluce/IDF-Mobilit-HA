@@ -71,6 +71,8 @@ _LOGGER = logging.getLogger(__name__)
 
 CONF_QUERY = "query"
 CONF_CLEAR_DESTINATION = "clear_destination"
+CONF_DESTINATION_QUERY = "destination_query"
+TITLE_DEST_SEP = " → "
 MAX_CALLS_PER_DAY = 900  # PRIM quota is 1000/day; keep headroom
 
 
@@ -403,6 +405,17 @@ class IdfmConfigFlow(ConfigFlow, domain=DOMAIN):
 class IdfmOptionsFlow(OptionsFlow):
     """Options flow."""
 
+    def __init__(self) -> None:
+        self._pending_options: dict[str, Any] = {}
+        self._places: dict[str, Place] = {}
+
+    @property
+    def _is_stop_mode(self) -> bool:
+        return self.config_entry.data.get(CONF_MODE) != MODE_JOURNEY
+
+    def _strip_title(self) -> str:
+        return self.config_entry.title.split(TITLE_DEST_SEP)[0]
+
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
@@ -410,18 +423,42 @@ class IdfmOptionsFlow(OptionsFlow):
         if user_input is not None:
             data = {k: v for k, v in user_input.items() if v is not None}
             clear = data.pop(CONF_CLEAR_DESTINATION, False)
+            query = str(data.pop(CONF_DESTINATION_QUERY, "") or "").strip()
+            if not self._is_stop_mode:
+                query = ""
             if self._estimated_calls_per_day(data) > MAX_CALLS_PER_DAY:
                 errors["base"] = "quota_exceeded"
+            elif clear:
+                new_data = {
+                    k: v
+                    for k, v in self.config_entry.data.items()
+                    if k not in (CONF_STOP_DEST_ID, CONF_STOP_DEST_NAME)
+                }
+                # unique_id is intentionally left unchanged (it may embed the
+                # destination chosen at creation time).
+                self.hass.config_entries.async_update_entry(
+                    self.config_entry, data=new_data, title=self._strip_title()
+                )
+                return self.async_create_entry(title="", data=data)
+            elif query:
+                client = PrimClient(
+                    async_get_clientsession(self.hass),
+                    self.config_entry.data.get(CONF_API_KEY, ""),
+                )
+                try:
+                    places = await client.search_places(query, ("stop_area",))
+                except PrimAuthError:
+                    errors["base"] = "invalid_auth"
+                except PrimError:
+                    errors["base"] = "cannot_connect"
+                else:
+                    if not places:
+                        errors["base"] = "no_results"
+                    else:
+                        self._places = {p.id: p for p in places}
+                        self._pending_options = data
+                        return await self.async_step_destination_select()
             else:
-                if clear:
-                    new_data = {
-                        k: v
-                        for k, v in self.config_entry.data.items()
-                        if k not in (CONF_STOP_DEST_ID, CONF_STOP_DEST_NAME)
-                    }
-                    self.hass.config_entries.async_update_entry(
-                        self.config_entry, data=new_data
-                    )
                 return self.async_create_entry(title="", data=data)
 
         opts = self.config_entry.options
@@ -439,6 +476,8 @@ class IdfmOptionsFlow(OptionsFlow):
                 )
             ] = bool
             dest_fields[vol.Required(CONF_CLEAR_DESTINATION, default=False)] = bool
+        if self._is_stop_mode:
+            dest_fields[vol.Optional(CONF_DESTINATION_QUERY)] = TextSelector()
         schema = vol.Schema(
             {
                 **dest_fields,
@@ -475,7 +514,38 @@ class IdfmOptionsFlow(OptionsFlow):
         )
         if user_input is not None:
             schema = self.add_suggested_values_to_schema(schema, user_input)
-        return self.async_show_form(step_id="init", data_schema=schema, errors=errors)
+        dest_name = self.config_entry.data.get(CONF_STOP_DEST_NAME) or (
+            "aucune" if self.hass.config.language.startswith("fr") else "none"
+        )
+        return self.async_show_form(
+            step_id="init",
+            data_schema=schema,
+            errors=errors,
+            description_placeholders={"destination": dest_name},
+        )
+
+    async def async_step_destination_select(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if user_input is not None:
+            dest = self._places[user_input[CONF_STOP_DEST_ID]]
+            # unique_id is intentionally left unchanged: it may embed the
+            # destination chosen at creation, and changing it could collide.
+            self.hass.config_entries.async_update_entry(
+                self.config_entry,
+                data={
+                    **self.config_entry.data,
+                    CONF_STOP_DEST_ID: dest.id,
+                    CONF_STOP_DEST_NAME: dest.name,
+                },
+                title=f"{self._strip_title()}{TITLE_DEST_SEP}{dest.name}",
+            )
+            return self.async_create_entry(title="", data=self._pending_options)
+        options = [{"value": p.id, "label": p.name} for p in self._places.values()]
+        return self.async_show_form(
+            step_id="destination_select",
+            data_schema=vol.Schema({vol.Required(CONF_STOP_DEST_ID): _select(options)}),
+        )
 
     def _estimated_calls_per_day(self, new_opts: dict[str, Any]) -> float:
         """SIRI calls/day over all entries sharing this API key."""

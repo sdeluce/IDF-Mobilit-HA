@@ -96,13 +96,23 @@
           "active_end": "Actif jusqu'à",
           "departures_count": "Nombre de départs",
           "direct_only": "Trains directs uniquement (sans correspondance)",
-          "clear_destination": "Supprimer la gare de destination"
+          "clear_destination": "Supprimer la gare de destination",
+          "destination_query": "Gare de destination (recherche, laisser vide pour ne rien changer)"
         },
-        "description": "Le quota PRIM est de 1000 appels/jour par clé API. Appels estimés = fenêtre active / intervalle de rafraîchissement, somme sur toutes les entrées partageant cette clé ; doit rester sous 900."
+        "description": "Destination actuelle : {destination}. Le quota PRIM est de 1000 appels/jour par clé API. Appels estimés = fenêtre active / intervalle de rafraîchissement, somme sur toutes les entrées partageant cette clé ; doit rester sous 900."
+      },
+      "destination_select": {
+        "title": "Choisir la gare de destination",
+        "data": {
+          "stop_dest_id": "Gare de destination"
+        }
       }
     },
     "error": {
-      "quota_exceeded": "Les appels PRIM estimés par jour (toutes les entrées partageant cette clé API) dépasseraient 900 sur le quota de 1000/jour. Augmentez l'intervalle de rafraîchissement ou réduisez la fenêtre active."
+      "quota_exceeded": "Les appels PRIM estimés par jour (toutes les entrées partageant cette clé API) dépasseraient 900 sur le quota de 1000/jour. Augmentez l'intervalle de rafraîchissement ou réduisez la fenêtre active.",
+      "no_results": "Aucun résultat",
+      "cannot_connect": "Impossible de se connecter à PRIM",
+      "invalid_auth": "Clé API invalide"
     }
   },
   "entity": {

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 from contextlib import ExitStack
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -231,7 +233,9 @@ async def test_static_path_registered_once(hass) -> None:
     assert cfgs[0].path.endswith("custom_components/idfm_departure/www")
     assert cfgs[0].cache_headers is False
     add_js.assert_called_once()
-    assert add_js.call_args.args[1] == "/idfm_departure_static/idfm-departure-card.js?v=0.1.0"
+    manifest = Path(__file__).parents[1] / "custom_components/idfm_departure/manifest.json"
+    version = json.loads(manifest.read_text())["version"]
+    assert add_js.call_args.args[1] == f"/idfm_departure_static/idfm-departure-card.js?v={version}"
 
 
 async def test_arrival_sensor_only_with_destination(hass, freezer) -> None:
