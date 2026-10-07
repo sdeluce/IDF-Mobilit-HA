@@ -108,11 +108,14 @@
     .bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px;
       font-size: calc(var(--idfm-footer-size, var(--d-footer)) * var(--idfm-scale, 1)); }
     .bottom-wrap { display: flex; flex-direction: column; gap: 2px; }
-    .plat { flex: none; white-space: nowrap; }
+    .plat { flex: none; white-space: nowrap; margin-left: .35em; }
     .plat[hidden] { display: none; }
     .plat b { font-weight: 800; line-height: 1;
       font-size: calc(var(--idfm-platform-size, calc(var(--idfm-footer-size, var(--d-footer)) * 1.25)) * var(--idfm-scale, 1)); }
-    .dep-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dep-text { flex: none; white-space: nowrap; }
+    .arr-inline { display: flex; align-items: baseline; flex: 1 1 0; min-width: 11ch; margin-left: .6em; white-space: nowrap; }
+    .arr-name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0 .3em; }
+    .arr-arrow, .arr-time { flex: none; white-space: nowrap; }
     .arr-line { font-size: calc(var(--idfm-next-size, var(--d-next)) * var(--idfm-scale, 1)); color: var(--secondary-text-color, #727272);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: none; }
     .arr-inline[hidden], .arr-line[hidden], .warn[hidden] { display: none; }
@@ -121,11 +124,11 @@
       .arr-inline { display: none; }
       .arr-line:not([hidden]) { display: block; }
     }
-    .dep { display: flex; align-items: center; gap: 6px; min-width: 0; }
-    .rt { width: .55em; height: .55em; border-radius: 50%; background: var(--success-color, #43a047);
+    .dep { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 0; flex: 1 1 auto; min-width: 0; }
+    .rt { margin-left: .4em; width: .55em; height: .55em; border-radius: 50%; background: var(--success-color, #43a047);
       animation: pulse 1.6s ease-in-out infinite; flex: none; }
     .rt[hidden] { display: none; }
-    .weather { display: flex; align-items: center; gap: 4px; color: var(--secondary-text-color, #727272); }
+    .weather { flex: none; display: flex; align-items: center; gap: 4px; color: var(--secondary-text-color, #727272); }
     .weather[hidden] { display: none; }
     .weather ha-icon { --mdc-icon-size: calc(var(--idfm-weather-icon-size, 1.4em) * var(--idfm-scale, 1)); }
     @keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .3; transform: scale(.7); } }
@@ -296,7 +299,10 @@
       const bottom = el("div", "bottom");
       const dep = el("div", "dep");
       this._depText = el("span", "dep-text");
-      this._arrInline = el("span", "arr-inline dep-text");
+      this._arrInline = el("span", "arr-inline");
+      this._arrName = el("span", "arr-name");
+      this._arrTime = el("span", "arr-time");
+      this._arrInline.append(el("span", "arr-arrow", "\u2192"), this._arrName, this._arrTime);
       this._plat = el("span", "plat");
       this._plat.hidden = true;
       this._platLbl = el("span");
@@ -305,7 +311,7 @@
       this._rt = el("span", "rt");
       this._warn = el("span", "warn", "\u26A0");
       this._warn.hidden = true;
-      dep.append(this._depText, this._plat, this._arrInline, this._rt, this._warn);
+      dep.append(this._depText, this._rt, this._plat, this._arrInline, this._warn);
       this._weather = el("div", "weather");
       this._wIcon = document.createElement("ha-icon");
       this._wTemp = el("span");
@@ -413,7 +419,7 @@
       this._depText.textContent = depTime ? `${modeLabel} ${T.at} ${depTime}` : "";
       const plat = info.platform === undefined || info.platform === null ? "" : String(info.platform).trim();
       if (depTime && plat && c.show_platform !== false) {
-        this._platLbl.textContent = ` \u00B7 ${T.platform} `;
+        this._platLbl.textContent = `\u00B7 ${T.platform} `;
         this._platNum.textContent = plat;
         this._plat.hidden = false;
       } else {
@@ -426,12 +432,15 @@
       const destName = typeof a.destination_name === "string" ? a.destination_name : "";
       const arrTime = valid && destName && c.show_arrival !== false ? this._fmt(info.arrival_at) : "";
       if (arrTime) {
-        this._arrInline.textContent = `\u2192 ${destName} ${arrTime}`;
+        this._arrName.textContent = destName;
+        this._arrName.title = destName;
+        this._arrTime.textContent = arrTime;
         this._arrInline.hidden = false;
         this._arrLine.textContent = T.arrivalAt(destName, arrTime);
         this._arrLine.hidden = false;
       } else {
-        this._arrInline.textContent = "";
+        this._arrName.textContent = "";
+        this._arrTime.textContent = "";
         this._arrInline.hidden = true;
         this._arrLine.textContent = "";
         this._arrLine.hidden = true;
