@@ -182,7 +182,7 @@
     }
 
     setConfig(config) {
-      if (!config || !config.entity) throw new Error("L'option 'entity' est requise");
+      if (!config || typeof config.entity !== "string") throw new Error("L'option 'entity' est requise");
       this._config = { show_next: false, show_clock: true, show_arrival: true, show_platform: true, ...config };
       this._render();
     }
@@ -563,7 +563,7 @@
     }
 
     setConfig(config) {
-      if (!config || !config.entity) throw new Error("L'option 'entity' est requise");
+      if (!config || typeof config.entity !== "string") throw new Error("L'option 'entity' est requise");
       let n = Math.round(Number(config.count));
       if (!Number.isFinite(n)) n = 5;
       this._config = { show_arrival: true, show_direction: true, ...config, count: Math.min(10, Math.max(1, n)) };
@@ -682,25 +682,15 @@
     }
   }
 
-  if (!customElements.get("idfm-departure-list-card")) {
-    customElements.define("idfm-departure-list-card", IdfmDepartureListCard);
-  }
-  window.customCards = window.customCards || [];
-  window.customCards.push({
-    type: "idfm-departure-list-card",
-    name: "IDFM Départs détaillés",
-    description: "Tableau des prochains départs : ligne, direction, heure pour partir, voie et arrivée.",
-    preview: true,
-  });
-
-  if (!customElements.get("idfm-departure-card")) {
-    customElements.define("idfm-departure-card", IdfmDepartureCard);
-  }
-  window.customCards = window.customCards || [];
-  window.customCards.push({
-    type: "idfm-departure-card",
-    name: "IDFM Prochain Départ",
-    description: "Prochain départ à quitter la maison, avec minutes restantes, ligne et météo.",
-    preview: true,
-  });
+  const register = (tag, cls, name, description) => {
+    if (!customElements.get(tag)) customElements.define(tag, cls);
+    window.customCards = window.customCards || [];
+    if (!window.customCards.some((c) => c && c.type === tag)) {
+      window.customCards.push({ type: tag, name, description, preview: true });
+    }
+  };
+  register("idfm-departure-list-card", IdfmDepartureListCard, "IDFM Départs détaillés",
+    "Tableau des prochains départs : ligne, direction, heure pour partir, voie et arrivée.");
+  register("idfm-departure-card", IdfmDepartureCard, "IDFM Prochain Départ",
+    "Prochain départ à quitter la maison, avec minutes restantes, ligne et météo.");
 })();
