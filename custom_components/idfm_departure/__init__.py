@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
 import voluptuous as vol
@@ -14,11 +15,14 @@ from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.start import async_at_started
 from homeassistant.helpers.typing import ConfigType
 
 from .api import PrimClient
 from .const import ATTR_ENTRY_ID, CONF_API_KEY, DOMAIN, PLATFORMS, SERVICE_REFRESH
 from .coordinator import IdfmCoordinator
+
+_LOGGER = logging.getLogger(__name__)
 
 type IdfmConfigEntry = ConfigEntry[IdfmCoordinator]
 
@@ -42,6 +46,50 @@ async def _async_register_frontend(hass: HomeAssistant) -> None:
         [StaticPathConfig(STATIC_URL, str(_WWW_DIR), cache_headers=False)]
     )
     add_extra_js_url(hass, f"{STATIC_URL}/{CARD_FILE}?v={version}")
+
+    async def _register_resource(hass: HomeAssistant) -> None:
+        await _async_register_resource(hass, version)
+
+    async_at_started(hass, _register_resource)
+
+
+def _get_lovelace_resources(hass: HomeAssistant) -> object | None:
+    """Return the Lovelace resources collection (new or legacy HA layout)."""
+    try:
+        from homeassistant.components.lovelace.const import LOVELACE_DATA
+
+        data = hass.data.get(LOVELACE_DATA)
+    except ImportError:
+        data = hass.data.get("lovelace")
+    if data is None:
+        return None
+    if isinstance(data, dict):
+        return data.get("resources")
+    return getattr(data, "resources", None)
+
+
+async def _async_register_resource(hass: HomeAssistant, version: str) -> None:
+    """Add or refresh the card as a Lovelace module resource (storage mode)."""
+    try:
+        resources = _get_lovelace_resources(hass)
+        if resources is None or not hasattr(resources, "async_create_item"):
+            _LOGGER.debug("Lovelace resources not in storage mode; skipping")
+            return
+        if not resources.loaded:
+            await resources.async_load()
+            resources.loaded = True
+        base = f"{STATIC_URL}/{CARD_FILE}"
+        new_url = f"{base}?v={version}"
+        for item in resources.async_items():
+            if item.get("url", "").split("?", 1)[0] == base:
+                if item["url"] != new_url:
+                    await resources.async_update_item(
+                        item["id"], {"res_type": "module", "url": new_url}
+                    )
+                return
+        await resources.async_create_item({"res_type": "module", "url": new_url})
+    except Exception:  # noqa: BLE001
+        _LOGGER.warning("Could not register Lovelace resource", exc_info=True)
 
 
 SERVICE_SCHEMA = vol.Schema({vol.Optional(ATTR_ENTRY_ID): cv.string})

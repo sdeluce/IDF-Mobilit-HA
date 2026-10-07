@@ -287,3 +287,90 @@ async def test_arrival_sensor_with_stop_destination(hass, freezer) -> None:
         assert attrs["arrival_at"] == arrival.isoformat()
         assert attrs["destination_name"] == "La Défense"
         assert attrs["destination_filter_active"] is True
+
+
+class _FakeResources:
+    def __init__(self, items=None, loaded=True) -> None:
+        self.items = items or []
+        self.loaded = loaded
+        self.async_load = AsyncMock()
+        self.async_create_item = AsyncMock()
+        self.async_update_item = AsyncMock()
+
+    def async_items(self):
+        return self.items
+
+
+class _YamlResources:
+    loaded = True
+
+    def async_items(self):
+        return []
+
+
+def _hass_with(hass, resources):
+    from homeassistant.components.lovelace.const import LOVELACE_DATA
+
+    hass.data[LOVELACE_DATA] = type("D", (), {"resources": resources})()
+
+
+async def test_resource_created_when_missing(hass) -> None:
+    from custom_components.idfm_departure import _async_register_resource
+
+    res = _FakeResources(
+        [{"id": "a", "url": "/other.js"}], loaded=False
+    )
+    _hass_with(hass, res)
+    await _async_register_resource(hass, "1.2.3")
+    res.async_load.assert_awaited_once()
+    assert res.loaded is True
+    res.async_create_item.assert_awaited_once_with(
+        {"res_type": "module", "url": "/idfm_departure_static/idfm-departure-card.js?v=1.2.3"}
+    )
+    res.async_update_item.assert_not_awaited()
+
+
+async def test_resource_updated_on_version_change(hass) -> None:
+    from custom_components.idfm_departure import _async_register_resource
+
+    res = _FakeResources(
+        [{"id": "x1", "url": "/idfm_departure_static/idfm-departure-card.js?v=1.0.0"}]
+    )
+    _hass_with(hass, res)
+    await _async_register_resource(hass, "1.2.3")
+    res.async_update_item.assert_awaited_once_with(
+        "x1",
+        {"res_type": "module", "url": "/idfm_departure_static/idfm-departure-card.js?v=1.2.3"},
+    )
+    res.async_create_item.assert_not_awaited()
+    res.async_load.assert_not_awaited()
+
+
+async def test_resource_current_is_noop(hass) -> None:
+    from custom_components.idfm_departure import _async_register_resource
+
+    res = _FakeResources(
+        [{"id": "x1", "url": "/idfm_departure_static/idfm-departure-card.js?v=1.2.3"}]
+    )
+    _hass_with(hass, res)
+    await _async_register_resource(hass, "1.2.3")
+    res.async_update_item.assert_not_awaited()
+    res.async_create_item.assert_not_awaited()
+
+
+async def test_resource_skipped_in_yaml_mode_or_missing(hass) -> None:
+    from custom_components.idfm_departure import _async_register_resource
+
+    await _async_register_resource(hass, "1.2.3")  # no lovelace data at all
+    _hass_with(hass, _YamlResources())
+    await _async_register_resource(hass, "1.2.3")  # must not raise
+
+
+async def test_resource_failure_only_warns(hass, caplog) -> None:
+    from custom_components.idfm_departure import _async_register_resource
+
+    res = _FakeResources()
+    res.async_create_item.side_effect = RuntimeError("boom")
+    _hass_with(hass, res)
+    await _async_register_resource(hass, "1.2.3")
+    assert "Could not register Lovelace resource" in caplog.text
