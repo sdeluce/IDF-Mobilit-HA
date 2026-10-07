@@ -1,0 +1,129 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "IDFM Prochain Départ",
+        "description": "Saisissez votre clé API PRIM et la position de votre domicile. Les coordonnées, si renseignées, priment sur l'entité.",
+        "data": {
+          "api_key": "Clé API PRIM",
+          "home_entity": "Entité domicile (zone ou personne)",
+          "home_lat": "Latitude du domicile (optionnel)",
+          "home_lon": "Longitude du domicile (optionnel)"
+        }
+      },
+      "mode": {
+        "title": "Que souhaitez-vous suivre ?",
+        "description": "Choisissez un arrêt (prochains passages) ou une destination (trajet depuis le domicile).",
+        "menu_options": {
+          "stop_search": "Un arrêt",
+          "destination_search": "Une destination"
+        }
+      },
+      "stop_search": {
+        "title": "Rechercher un arrêt",
+        "data": {
+          "query": "Nom de l'arrêt"
+        }
+      },
+      "stop_select": {
+        "title": "Choisir l'arrêt",
+        "data": {
+          "stop_id": "Arrêt"
+        }
+      },
+      "stop_options": {
+        "title": "Ligne et direction",
+        "description": "Les deux filtres sont optionnels.",
+        "data": {
+          "line_id": "Ligne",
+          "direction_filter": "Filtre de direction (texte)"
+        }
+      },
+      "destination_search": {
+        "title": "Rechercher une destination",
+        "data": {
+          "query": "Destination"
+        }
+      },
+      "destination_select": {
+        "title": "Choisir la destination",
+        "data": {
+          "destination_id": "Destination"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Réauthentification",
+        "description": "La clé API a été refusée. Saisissez une nouvelle clé API PRIM.",
+        "data": {
+          "api_key": "Clé API PRIM"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Clé API invalide",
+      "cannot_connect": "Connexion à PRIM impossible",
+      "no_home": "Position du domicile introuvable : renseignez les coordonnées ou choisissez une entité avec une position",
+      "no_results": "Aucun résultat"
+    },
+    "abort": {
+      "already_configured": "Cette configuration existe déjà",
+      "reauth_successful": "Réauthentification réussie"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options",
+        "data": {
+          "margin_min": "Marge de sécurité (min)",
+          "walk_override_min": "Temps de marche forcé (min, vide = automatique)",
+          "scan_interval_s": "Intervalle de rafraîchissement (s)",
+          "journey_refresh_min": "Rafraîchissement du trajet (min)",
+          "active_start": "Actif à partir de",
+          "active_end": "Actif jusqu'à",
+          "departures_count": "Nombre de départs"
+        },
+        "description": "Le quota PRIM est de 1000 appels/jour par clé API. Appels estimés = fenêtre active / intervalle de rafraîchissement, somme sur toutes les entrées partageant cette clé ; doit rester sous 900."
+      }
+    },
+    "error": {
+      "quota_exceeded": "Les appels PRIM estimés par jour (toutes les entrées partageant cette clé API) dépasseraient 900 sur le quota de 1000/jour. Augmentez l'intervalle de rafraîchissement ou réduisez la fenêtre active."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "leave_at": {
+        "name": "Heure de départ"
+      },
+      "minutes_until_leave": {
+        "name": "Minutes avant départ"
+      },
+      "departure_at_stop": {
+        "name": "Passage à l'arrêt"
+      },
+      "line": {
+        "name": "Ligne"
+      },
+      "walk_time": {
+        "name": "Temps de marche"
+      }
+    },
+    "binary_sensor": {
+      "time_to_leave": {
+        "name": "C'est l'heure de partir"
+      }
+    }
+  },
+  "services": {
+    "refresh": {
+      "name": "Rafraîchir",
+      "description": "Force un rafraîchissement immédiat, hors plage d'activité.",
+      "fields": {
+        "entry_id": {
+          "name": "ID de l'entrée",
+          "description": "Entrée à rafraîchir (toutes si vide)."
+        }
+      }
+    }
+  }
+}

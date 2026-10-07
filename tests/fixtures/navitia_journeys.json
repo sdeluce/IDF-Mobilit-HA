@@ -1,0 +1,40 @@
+{
+  "journeys": [
+    {
+      "duration": 2700, "arrival_date_time": "20261007T095500",
+      "sections": [
+        {"type": "street_network", "mode": "walking", "duration": 300, "departure_date_time": "20261007T091500", "arrival_date_time": "20261007T092000"},
+        {"type": "waiting", "duration": 120},
+        {"type": "public_transport", "duration": 1200, "departure_date_time": "20261007T092200", "arrival_date_time": "20261007T094200",
+         "from": {"id": "stop_point:IDFM:22113", "name": "Châtelet-Les Halles", "embedded_type": "stop_point",
+                  "stop_point": {"id": "stop_point:IDFM:22113", "name": "Châtelet-Les Halles"}},
+         "display_informations": {"code": "A", "network": "RATP", "commercial_mode": "RER", "physical_mode": "Train RER", "direction": "La Défense (Puteaux)", "label": "A", "color": "e2231a", "text_color": "FFFFFF"},
+         "links": [{"type": "line", "id": "line:IDFM:C01742"}, {"type": "route", "id": "route:IDFM:C01742_1"}]},
+        {"type": "transfer", "duration": 180},
+        {"type": "public_transport", "duration": 300, "departure_date_time": "20261007T094500", "arrival_date_time": "20261007T095000",
+         "from": {"id": "stop_point:IDFM:99999", "name": "La Défense", "embedded_type": "stop_point",
+                  "stop_point": {"id": "stop_point:IDFM:99999", "name": "La Défense"}},
+         "display_informations": {"code": "1", "commercial_mode": "Métro", "physical_mode": "Métro", "direction": "Château de Vincennes"},
+         "links": [{"type": "line", "id": "line:IDFM:C01371"}]},
+        {"type": "street_network", "mode": "walking", "duration": 100}
+      ]
+    },
+    {
+      "duration": 3000, "arrival_date_time": "20261007T100500",
+      "sections": [
+        {"type": "street_network", "mode": "walking", "duration": 200},
+        {"type": "transfer", "duration": 61},
+        {"type": "waiting", "duration": 30},
+        {"type": "public_transport", "duration": 1500, "departure_date_time": "20261007T093000", "arrival_date_time": "20261007T095500",
+         "from": {"id": "stop_point:IDFM:33333", "name": "Rue de Rivoli", "embedded_type": "stop_point",
+                  "stop_point": {"id": "stop_point:IDFM:33333", "name": "Rue de Rivoli"}},
+         "display_informations": {"code": "91", "commercial_mode": "Bus", "physical_mode": "Bus", "direction": "Gare de Lyon"},
+         "links": [{"type": "line", "id": "line:IDFM:C01371"}]}
+      ]
+    },
+    {
+      "duration": 3600, "arrival_date_time": "20261007T101500",
+      "sections": [{"type": "street_network", "mode": "walking", "duration": 3600}]
+    }
+  ]
+}

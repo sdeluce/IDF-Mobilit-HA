@@ -1,0 +1,129 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "IDFM Prochain Départ",
+        "description": "Enter your PRIM API key and your home location. Coordinates, if set, take precedence over the entity.",
+        "data": {
+          "api_key": "PRIM API key",
+          "home_entity": "Home entity (zone or person)",
+          "home_lat": "Home latitude (optional)",
+          "home_lon": "Home longitude (optional)"
+        }
+      },
+      "mode": {
+        "title": "What do you want to follow?",
+        "description": "Choose a stop (next departures) or a destination (journey from home).",
+        "menu_options": {
+          "stop_search": "A stop",
+          "destination_search": "A destination"
+        }
+      },
+      "stop_search": {
+        "title": "Search a stop",
+        "data": {
+          "query": "Stop name"
+        }
+      },
+      "stop_select": {
+        "title": "Select the stop",
+        "data": {
+          "stop_id": "Stop"
+        }
+      },
+      "stop_options": {
+        "title": "Line and direction",
+        "description": "Both filters are optional.",
+        "data": {
+          "line_id": "Line",
+          "direction_filter": "Direction filter (text)"
+        }
+      },
+      "destination_search": {
+        "title": "Search a destination",
+        "data": {
+          "query": "Destination"
+        }
+      },
+      "destination_select": {
+        "title": "Select the destination",
+        "data": {
+          "destination_id": "Destination"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reauthentication",
+        "description": "The API key was rejected. Enter a new PRIM API key.",
+        "data": {
+          "api_key": "PRIM API key"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid API key",
+      "cannot_connect": "Cannot connect to PRIM",
+      "no_home": "Home location not found: set coordinates or pick an entity with a position",
+      "no_results": "No results"
+    },
+    "abort": {
+      "already_configured": "This configuration already exists",
+      "reauth_successful": "Reauthentication successful"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options",
+        "data": {
+          "margin_min": "Safety margin (min)",
+          "walk_override_min": "Walking time override (min, empty = automatic)",
+          "scan_interval_s": "Refresh interval (s)",
+          "journey_refresh_min": "Journey refresh (min)",
+          "active_start": "Active from",
+          "active_end": "Active until",
+          "departures_count": "Number of departures"
+        },
+        "description": "The PRIM quota is 1000 calls/day per API key. Estimated calls = active window / refresh interval, summed over all entries sharing this key; it must stay under 900."
+      }
+    },
+    "error": {
+      "quota_exceeded": "Estimated PRIM calls/day (all entries sharing this API key) would exceed 900 of the 1000/day quota. Increase the refresh interval or shorten the active window."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "leave_at": {
+        "name": "Leave at"
+      },
+      "minutes_until_leave": {
+        "name": "Minutes until leave"
+      },
+      "departure_at_stop": {
+        "name": "Departure at stop"
+      },
+      "line": {
+        "name": "Line"
+      },
+      "walk_time": {
+        "name": "Walking time"
+      }
+    },
+    "binary_sensor": {
+      "time_to_leave": {
+        "name": "Time to leave"
+      }
+    }
+  },
+  "services": {
+    "refresh": {
+      "name": "Refresh",
+      "description": "Forces an immediate refresh, ignoring the active window.",
+      "fields": {
+        "entry_id": {
+          "name": "Entry ID",
+          "description": "Config entry to refresh (all if empty)."
+        }
+      }
+    }
+  }
+}

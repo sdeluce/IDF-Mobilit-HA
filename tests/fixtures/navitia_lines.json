@@ -1,0 +1,17 @@
+{
+  "lines": [
+    {"id": "line:IDFM:C01742", "code": "A", "name": "RER A", "color": "E2231A",
+     "commercial_mode": {"id": "commercial_mode:RapidTransit", "name": "RER"},
+     "physical_modes": [{"id": "physical_mode:RapidTransit", "name": "Train RER"}],
+     "network": {"id": "network:IDFM:Operator_100", "name": "RATP"}},
+    {"id": "line:IDFM:C01371", "code": "91", "name": "Bus 91", "color": "0055C8",
+     "commercial_mode": {"id": "commercial_mode:Bus", "name": "Bus"},
+     "physical_modes": [{"id": "physical_mode:Bus", "name": "Bus"}],
+     "network": {"id": "network:IDFM:Operator_100", "name": "RATP"}},
+    {"id": "line:IDFM:C01379", "code": "14", "name": "Ligne 14",
+     "commercial_mode": {"id": "commercial_mode:Metro", "name": "Métro"},
+     "physical_modes": [{"id": "physical_mode:Metro", "name": "Métro"}]},
+    {"id": "line:IDFM:C99999", "name": "Ligne sans code",
+     "physical_modes": [{"id": "physical_mode:Funicular", "name": "Funiculaire"}]}
+  ]
+}

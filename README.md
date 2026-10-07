@@ -1,0 +1,129 @@
+# IDFM Prochain Départ
+
+Intégration Home Assistant (HACS) qui calcule **à quelle heure partir de chez vous** pour
+attraper le prochain passage d'un arrêt d'Île-de-France Mobilités :
+
+`heure de départ = passage à l'arrêt − temps de marche − marge`
+
+## Installation (HACS, dépôt personnalisé)
+
+1. HACS → menu ⋮ → *Dépôts personnalisés* → ajoutez l'URL de ce dépôt, catégorie *Intégration*.
+2. Installez « IDFM Prochain Départ », redémarrez Home Assistant.
+3. *Paramètres → Appareils et services → Ajouter une intégration → IDFM Prochain Départ*.
+
+## Obtenir une clé PRIM
+
+1. Créez un compte sur <https://prim.iledefrance-mobilites.fr>.
+2. Dans *Mon espace → Mes jetons d'authentification*, générez un jeton : c'est votre clé API.
+3. Dans le catalogue, souscrivez (gratuitement) aux deux APIs :
+   - **Prochains passages** (stop-monitoring, SIRI) ;
+   - **Navitia** (recherche de lieux, itinéraires, temps de marche).
+
+Sans ces deux souscriptions, la clé sera refusée (`invalid_auth`) ou certaines recherches échoueront.
+
+## Quota
+
+Le quota gratuit est d'environ **1000 requêtes par jour et par clé**. Les entrées d'une même clé
+s'additionnent (le total n'est pas bloqué, seulement rapporté dans l'attribut `api_usage`).
+
+| Usage | Requêtes / jour |
+|---|---|
+| Mode arrêt, SIRI toutes les 120 s de 05:30 à 01:00 | ~585 |
+| Mode trajet : Navitia toutes les 10 min en plus | ~117 |
+| Temps de marche et lignes de l'arrêt (1 fois par jour) | ~2 |
+
+Conseil : gardez 120 s ou plus, limitez la plage d'activité, et n'ajoutez pas trop d'entrées avec la même clé.
+En dehors de la plage d'activité aucune requête n'est émise.
+
+## Configuration
+
+1. **Clé API et domicile** : entité `zone.home` par défaut, ou latitude/longitude manuelles
+   (elles priment sur l'entité).
+2. **Choix du mode** :
+   - *Un arrêt* : recherchez le nom, choisissez l'arrêt, puis (optionnel) une ligne et un filtre de
+     direction (texte, insensible à la casse et aux accents).
+   - *Une destination* : recherchez un lieu ; l'intégration calcule le trajet depuis le domicile et
+     affine le premier passage en transport avec les horaires temps réel.
+3. **Options** (roue dentée de l'entrée) : marge (défaut 3 min), temps de marche forcé (vide =
+   automatique), intervalle de rafraîchissement (60–3600 s), rafraîchissement du trajet (défaut 10 min),
+   plage d'activité (05:30 → 01:00), nombre de départs (défaut 3).
+
+## Entités
+
+| Entité | Description |
+|---|---|
+| `sensor.…_leave_at` | Heure à laquelle partir (horodatage), attribut `departures` |
+| `sensor.…_minutes_until_leave` | Minutes restantes avant de partir |
+| `sensor.…_departure_at_stop` | Heure de passage à l'arrêt (`realtime`, `source`) |
+| `sensor.…_line` | Ligne du prochain passage (`mode`, `direction`) |
+| `sensor.…_walk_time` | Temps de marche en minutes (`source` : auto/manual) |
+| `binary_sensor.…_time_to_leave` | Actif quand il reste 0 à 1 minute avant de partir |
+
+## Service
+
+`idfm_departure.refresh` : force un rafraîchissement immédiat (même hors plage d'activité).
+Paramètre optionnel `entry_id` ; sans lui, toutes les entrées chargées sont rafraîchies.
+
+## Exemple d'automatisation
+
+```yaml
+automation:
+  - alias: "Il est l'heure de partir"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.chatelet_time_to_leave
+        to: "on"
+    action:
+      - service: notify.mobile_app_mon_telephone
+        data:
+          title: "Il est temps de partir"
+          message: >
+            Ligne {{ states('sensor.chatelet_line') }} à
+            {{ as_timestamp(states('sensor.chatelet_departure_at_stop')) | timestamp_custom('%H:%M') }}
+```
+
+## Exemple Lovelace
+
+```yaml
+type: entities
+title: Prochain départ
+entities:
+  - entity: sensor.chatelet_minutes_until_leave
+  - entity: sensor.chatelet_leave_at
+  - entity: sensor.chatelet_line
+  - entity: sensor.chatelet_walk_time
+  - entity: binary_sensor.chatelet_time_to_leave
+```
+
+Les identifiants d'entités dépendent du titre de l'entrée ; adaptez-les.
+
+## Carte Lovelace
+
+L'intégration fournit une carte personnalisée `idfm-departure-card` : pastille de ligne, arrêt, heure,
+gros compteur « Partir dans N min », mode et heure de départ, et météo optionnelle. Les minutes sont
+recalculées côté navigateur toutes les 10 secondes.
+
+La carte est chargée automatiquement par l'intégration (servie sur
+`/idfm_departure_static/idfm-departure-card.js`). Si elle n'apparaît pas dans le sélecteur de cartes,
+ajoutez-la manuellement comme ressource JavaScript (module) : *Paramètres > Tableaux de bord >
+Ressources*, URL `/idfm_departure_static/idfm-departure-card.js`.
+
+```yaml
+type: custom:idfm-departure-card
+entity: sensor.chatelet_leave_at
+weather_entity: weather.maison
+show_next: true
+```
+
+| Option | Obligatoire | Défaut | Description |
+|---|---|---|---|
+| `entity` | oui | | Capteur `leave_at` de l'intégration |
+| `weather_entity` | non | | Entité `weather.*` (icône et température) |
+| `title` | non | nom de l'arrêt | Remplace le nom de l'arrêt |
+| `show_next` | non | `false` | Affiche « Puis : 15:34, 15:38 » (départs suivants) |
+| `show_clock` | non | `true` | Affiche l'heure courante en haut à droite |
+
+## Limites
+
+Seul le premier tronçon en transport est affiné en temps réel en mode trajet. Les formats de certaines
+requêtes (temps de marche Navitia, paramètre `LineRef` SIRI) n'ont pas encore été vérifiés avec une vraie clé.

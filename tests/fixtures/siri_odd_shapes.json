@@ -1,0 +1,40 @@
+{
+  "Siri": {
+    "ServiceDelivery": {
+      "StopMonitoringDelivery": [
+        null,
+        "garbage",
+        {
+          "MonitoredStopVisit": {
+            "MonitoringRef": {"value": "STIF:StopPoint:Q:22113:"},
+            "MonitoredVehicleJourney": {
+              "LineRef": {"value": "STIF:Line::C01742:"},
+              "PublishedLineName": [{"value": "A"}],
+              "DestinationName": [{"value": "Marne-la-Vallee"}],
+              "MonitoredCall": [
+                "junk",
+                {"ExpectedDepartureTime": "2026-10-07T07:20:00.000Z"}
+              ]
+            }
+          }
+        },
+        {
+          "MonitoredStopVisit": [
+            null,
+            42,
+            {
+              "MonitoredVehicleJourney": {
+                "MonitoredVehicleJourney": {
+                  "LineRef": {"value": "STIF:Line::C01371:"},
+                  "MonitoredCall": {"AimedDepartureTime": "2026-10-07T07:30:00Z"}
+                }
+              }
+            },
+            {"MonitoredVehicleJourney": null},
+            {"MonitoredVehicleJourney": "text"}
+          ]
+        }
+      ]
+    }
+  }
+}

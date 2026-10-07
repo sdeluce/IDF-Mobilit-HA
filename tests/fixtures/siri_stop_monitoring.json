@@ -1,0 +1,100 @@
+{
+  "Siri": {
+    "ServiceDelivery": {
+      "ResponseTimestamp": "2026-10-07T07:00:00.000Z",
+      "StopMonitoringDelivery": [
+        {
+          "ResponseTimestamp": "2026-10-07T07:00:00.000Z",
+          "Status": "true",
+          "MonitoredStopVisit": [
+            {
+              "RecordedAtTime": "2026-10-07T06:59:40.000Z",
+              "MonitoringRef": {"value": "STIF:StopPoint:Q:22113:"},
+              "MonitoredVehicleJourney": {
+                "LineRef": {"value": "STIF:Line::C01742:"},
+                "PublishedLineName": [{"value": "RER A"}],
+                "DirectionName": [{"value": "Marne-la-Vallée"}],
+                "DestinationName": [{"value": "La Défense"}],
+                "MonitoredCall": {
+                  "StopPointName": [{"value": "Châtelet-Les Halles"}],
+                  "AimedDepartureTime": "2026-10-07T07:18:00.000Z",
+                  "ExpectedDepartureTime": "2026-10-07T07:20:00.000Z"
+                }
+              }
+            },
+            {
+              "MonitoringRef": {"value": "STIF:StopPoint:Q:22113:"},
+              "MonitoredVehicleJourney": {
+                "LineRef": "STIF:Line::C01742:",
+                "PublishedLineName": "RER A",
+                "DirectionName": "Marne-la-Vallée",
+                "DestinationName": "Marne-la-Vallée Chessy",
+                "MonitoredCall": {
+                  "AimedDepartureTime": "2026-10-07T09:33:00.000+02:00",
+                  "ExpectedDepartureTime": "2026-10-07T09:35:00.000+02:00"
+                }
+              }
+            },
+            {
+              "MonitoringRef": {"value": "STIF:StopPoint:Q:22113:"},
+              "MonitoredVehicleJourney": {
+                "LineRef": {"value": "STIF:Line::C01371:"},
+                "PublishedLineName": [{"value": "91"}],
+                "DestinationName": [{"value": "Gare de Lyon"}],
+                "MonitoredCall": {
+                  "AimedDepartureTime": "2026-10-07T07:10:00.000Z",
+                  "ExpectedDepartureTime": "2026-10-07T07:12:00.000Z"
+                }
+              }
+            },
+            {
+              "MonitoringRef": {"value": "STIF:StopPoint:Q:22113:"},
+              "MonitoredVehicleJourney": {
+                "LineRef": {"value": "STIF:Line::C01742:"},
+                "PublishedLineName": [{"value": "RER A"}],
+                "DestinationName": [{"value": "La Défense"}],
+                "MonitoredCall": {
+                  "AimedDepartureTime": "2026-10-07T06:48:00.000Z",
+                  "ExpectedDepartureTime": "2026-10-07T06:50:00.000Z"
+                }
+              }
+            },
+            {
+              "MonitoringRef": {"value": "STIF:StopPoint:Q:22113:"},
+              "MonitoredVehicleJourney": {
+                "LineRef": {"value": "STIF:Line::C01371:"},
+                "PublishedLineName": [{"value": "91"}],
+                "DestinationName": [{"value": "Montparnasse"}],
+                "MonitoredCall": {
+                  "AimedDepartureTime": "2026-10-07T07:40:00.000Z"
+                }
+              }
+            },
+            {
+              "MonitoringRef": {"value": "STIF:StopPoint:Q:22113:"},
+              "MonitoredVehicleJourney": {
+                "LineRef": {"value": "STIF:Line::C01742:"},
+                "PublishedLineName": [{"value": "RER A"}],
+                "DestinationName": [{"value": "Cergy"}],
+                "MonitoredCall": {
+                  "ExpectedArrivalTime": "2026-10-07T07:50:00.000Z"
+                }
+              }
+            },
+            {
+              "MonitoringRef": {"value": "STIF:StopPoint:Q:22113:"},
+              "MonitoredVehicleJourney": {
+                "LineRef": {"value": "STIF:Line::C01742:"},
+                "PublishedLineName": [{"value": "RER A"}],
+                "DestinationName": [{"value": "Poissy"}],
+                "MonitoredCall": {
+                  "StopPointName": [{"value": "Châtelet-Les Halles"}]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

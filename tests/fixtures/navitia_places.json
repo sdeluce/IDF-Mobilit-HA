@@ -1,0 +1,9 @@
+{
+  "places": [
+    {"id": "stop_area:IDFM:71517", "name": "Châtelet-Les Halles (Paris)", "quality": 90, "embedded_type": "stop_area",
+     "stop_area": {"id": "stop_area:IDFM:71517", "name": "Châtelet-Les Halles", "coord": {"lat": "48.862725", "lon": "2.346747"}}},
+    {"id": "poi:osm:1", "name": "Rue de Rivoli 75001 Paris", "quality": 50, "embedded_type": "address",
+     "address": {"id": "poi:osm:1", "name": "Rue de Rivoli", "coord": {"lat": "48.8602", "lon": "2.3477"}}},
+    {"id": "admin:fr:75056", "name": "Paris", "quality": 10, "embedded_type": "administrative_region"}
+  ]
+}

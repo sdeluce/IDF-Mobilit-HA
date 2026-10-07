@@ -1,0 +1,12 @@
+{
+  "domain": "idfm_departure",
+  "name": "IDFM Prochain Départ",
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": ["http", "frontend"],
+  "documentation": "https://github.com/<owner>/idfm_departure",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "requirements": [],
+  "version": "0.1.0"
+}

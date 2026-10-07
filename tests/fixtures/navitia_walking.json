@@ -1,0 +1,5 @@
+{
+  "journeys": [
+    {"duration": 412, "sections": [{"type": "street_network", "mode": "walking", "duration": 412}]}
+  ]
+}
