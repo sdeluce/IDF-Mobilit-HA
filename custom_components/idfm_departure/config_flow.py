@@ -14,7 +14,7 @@ from homeassistant.config_entries import (
     ConfigFlowResult,
     OptionsFlow,
 )
-from homeassistant.core import callback
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
     EntitySelector,
@@ -89,6 +89,24 @@ def _select(options: list[dict[str, str]]) -> SelectSelector:
     )
 
 
+CONF_HOME_FROM_HA = "home_from_ha"
+
+
+def _resolve_home(
+    hass: HomeAssistant, entity: str | None, lat: Any, lon: Any
+) -> tuple[float | None, float | None]:
+    """Manual lat/lon win; otherwise read them from the entity's attributes."""
+    if lat is None or lon is None:
+        lat = lon = None
+        state = hass.states.get(entity) if entity else None
+        if state is not None:
+            lat = state.attributes.get("latitude")
+            lon = state.attributes.get("longitude")
+    if lat is None or lon is None:
+        return None, None
+    return float(lat), float(lon)
+
+
 class IdfmConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle the config flow."""
 
@@ -125,15 +143,13 @@ class IdfmConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
-            lat = user_input.get(CONF_HOME_LAT)
-            lon = user_input.get(CONF_HOME_LON)
             entity = user_input.get(CONF_HOME_ENTITY)
-            if lat is None or lon is None:
-                lat = lon = None
-                state = self.hass.states.get(entity) if entity else None
-                if state is not None:
-                    lat = state.attributes.get("latitude")
-                    lon = state.attributes.get("longitude")
+            lat, lon = _resolve_home(
+                self.hass,
+                entity,
+                user_input.get(CONF_HOME_LAT),
+                user_input.get(CONF_HOME_LON),
+            )
             if lat is None or lon is None:
                 errors["base"] = "no_home"
             else:
@@ -143,8 +159,8 @@ class IdfmConfigFlow(ConfigFlow, domain=DOMAIN):
                 else:
                     self._api_key = user_input[CONF_API_KEY]
                     self._home_entity = entity
-                    self._lat = float(lat)
-                    self._lon = float(lon)
+                    self._lat = lat
+                    self._lon = lon
                     return await self.async_step_mode()
 
         schema = vol.Schema(
@@ -153,8 +169,14 @@ class IdfmConfigFlow(ConfigFlow, domain=DOMAIN):
                 vol.Optional(
                     CONF_HOME_ENTITY, default="zone.home"
                 ): EntitySelector(EntitySelectorConfig(domain=["zone", "person"])),
-                vol.Optional(CONF_HOME_LAT): vol.Coerce(float),
-                vol.Optional(CONF_HOME_LON): vol.Coerce(float),
+                vol.Optional(
+                    CONF_HOME_LAT,
+                    description={"suggested_value": self.hass.config.latitude},
+                ): vol.Coerce(float),
+                vol.Optional(
+                    CONF_HOME_LON,
+                    description={"suggested_value": self.hass.config.longitude},
+                ): vol.Coerce(float),
             }
         )
         return self.async_show_form(
@@ -407,6 +429,7 @@ class IdfmOptionsFlow(OptionsFlow):
 
     def __init__(self) -> None:
         self._pending_options: dict[str, Any] = {}
+        self._pending_home: dict[str, Any] = {}
         self._places: dict[str, Place] = {}
 
     @property
@@ -422,17 +445,41 @@ class IdfmOptionsFlow(OptionsFlow):
         errors: dict[str, str] = {}
         if user_input is not None:
             data = {k: v for k, v in user_input.items() if v is not None}
+            from_ha = data.pop(CONF_HOME_FROM_HA, False)
+            new_lat = data.pop(CONF_HOME_LAT, None)
+            new_lon = data.pop(CONF_HOME_LON, None)
+            if from_ha:
+                new_lat = self.hass.config.latitude
+                new_lon = self.hass.config.longitude
+            home_update: dict[str, Any] = {}
+            if (new_lat is None) != (new_lon is None):
+                errors["base"] = "invalid_coords"
+            elif new_lat is not None and new_lon is not None:
+                if not (-90 <= new_lat <= 90 and -180 <= new_lon <= 180):
+                    errors["base"] = "invalid_coords"
+                else:
+                    cur = self.config_entry.data
+                    if (new_lat, new_lon) != (
+                        cur.get(CONF_HOME_LAT),
+                        cur.get(CONF_HOME_LON),
+                    ):
+                        home_update = {CONF_HOME_LAT: new_lat, CONF_HOME_LON: new_lon}
             clear = data.pop(CONF_CLEAR_DESTINATION, False)
             query = str(data.pop(CONF_DESTINATION_QUERY, "") or "").strip()
             if not self._is_stop_mode:
                 query = ""
-            if self._estimated_calls_per_day(data) > MAX_CALLS_PER_DAY:
+            if errors:
+                pass
+            elif self._estimated_calls_per_day(data) > MAX_CALLS_PER_DAY:
                 errors["base"] = "quota_exceeded"
             elif clear:
                 new_data = {
-                    k: v
-                    for k, v in self.config_entry.data.items()
-                    if k not in (CONF_STOP_DEST_ID, CONF_STOP_DEST_NAME)
+                    **{
+                        k: v
+                        for k, v in self.config_entry.data.items()
+                        if k not in (CONF_STOP_DEST_ID, CONF_STOP_DEST_NAME)
+                    },
+                    **home_update,
                 }
                 # unique_id is intentionally left unchanged (it may embed the
                 # destination chosen at creation time).
@@ -457,8 +504,14 @@ class IdfmOptionsFlow(OptionsFlow):
                     else:
                         self._places = {p.id: p for p in places}
                         self._pending_options = data
+                        self._pending_home = home_update
                         return await self.async_step_destination_select()
             else:
+                if home_update:
+                    self.hass.config_entries.async_update_entry(
+                        self.config_entry,
+                        data={**self.config_entry.data, **home_update},
+                    )
                 return self.async_create_entry(title="", data=data)
 
         opts = self.config_entry.options
@@ -481,6 +534,19 @@ class IdfmOptionsFlow(OptionsFlow):
         schema = vol.Schema(
             {
                 **dest_fields,
+                vol.Optional(
+                    CONF_HOME_LAT,
+                    description={
+                        "suggested_value": self.config_entry.data.get(CONF_HOME_LAT)
+                    },
+                ): vol.Coerce(float),
+                vol.Optional(
+                    CONF_HOME_LON,
+                    description={
+                        "suggested_value": self.config_entry.data.get(CONF_HOME_LON)
+                    },
+                ): vol.Coerce(float),
+                vol.Optional(CONF_HOME_FROM_HA, default=False): bool,
                 vol.Required(
                     CONF_MARGIN_MIN, default=opts.get(CONF_MARGIN_MIN, DEFAULT_MARGIN_MIN)
                 ): vol.All(vol.Coerce(int), vol.Range(min=0, max=30)),
@@ -535,6 +601,7 @@ class IdfmOptionsFlow(OptionsFlow):
                 self.config_entry,
                 data={
                     **self.config_entry.data,
+                    **self._pending_home,
                     CONF_STOP_DEST_ID: dest.id,
                     CONF_STOP_DEST_NAME: dest.name,
                 },

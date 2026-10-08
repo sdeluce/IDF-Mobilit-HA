@@ -9,6 +9,10 @@
           "home_entity": "Home entity (zone or person)",
           "home_lat": "Home latitude (optional)",
           "home_lon": "Home longitude (optional)"
+        },
+        "data_description": {
+          "home_lat": "Prefilled from your Home Assistant home location; edit if needed. Leave empty to use the entity above.",
+          "home_lon": "Prefilled from your Home Assistant home location; edit if needed. Leave empty to use the entity above."
         }
       },
       "mode": {
@@ -97,9 +101,17 @@
           "departures_count": "Number of departures",
           "direct_only": "Direct trains only (no transfer)",
           "clear_destination": "Clear the destination station",
-          "destination_query": "Destination station (search, leave empty to keep unchanged)"
+          "destination_query": "Destination station (search, leave empty to keep unchanged)",
+          "home_lat": "Home latitude",
+          "home_lon": "Home longitude",
+          "home_from_ha": "Use the Home Assistant home location"
         },
-        "description": "Current destination: {destination}. The PRIM quota is 1000 calls/day per API key. Estimated calls = active window / refresh interval, summed over all entries sharing this key; it must stay under 900."
+        "description": "Current destination: {destination}. The PRIM quota is 1000 calls/day per API key. Estimated calls = active window / refresh interval, summed over all entries sharing this key; it must stay under 900.",
+        "data_description": {
+          "home_lat": "Prefilled from your Home Assistant home location; edit if needed. Leave empty to use the entity above.",
+          "home_lon": "Prefilled from your Home Assistant home location; edit if needed. Leave empty to use the entity above.",
+          "home_from_ha": "Overwrites the coordinates above with the current Home Assistant home location."
+        }
       },
       "destination_select": {
         "title": "Select the destination station",
@@ -112,7 +124,8 @@
       "quota_exceeded": "Estimated PRIM calls/day (all entries sharing this API key) would exceed 900 of the 1000/day quota. Increase the refresh interval or shorten the active window.",
       "no_results": "No results",
       "cannot_connect": "Cannot connect to PRIM",
-      "invalid_auth": "Invalid API key"
+      "invalid_auth": "Invalid API key",
+      "invalid_coords": "Invalid coordinates: latitude must be within -90..90 and longitude within -180..180, and both must be set"
     }
   },
   "entity": {

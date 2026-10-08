@@ -553,3 +553,79 @@ async def test_options_journey_mode_has_no_destination_query(hass):
     entry.add_to_hass(hass)
     result = await hass.config_entries.options.async_init(entry.entry_id)
     assert "destination_query" not in {str(k) for k in result["data_schema"].schema}
+
+
+def _suggested(schema, key):
+    for k in schema.schema:
+        if str(k) == key:
+            return (k.description or {}).get("suggested_value")
+    raise AssertionError(key)
+
+
+HOME_DATA = {"api_key": "K", "home_lat": 48.0, "home_lon": 2.0}
+OPTS = {
+    "margin_min": 5,
+    "scan_interval_s": 300,
+    "journey_refresh_min": 15,
+    "active_start": "06:00:00",
+    "active_end": "23:00:00",
+    "departures_count": 4,
+}
+
+
+async def test_setup_prefills_home_from_hass_config(hass):
+    hass.config.latitude = 45.5
+    hass.config.longitude = 3.25
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    schema = result["data_schema"]
+    assert _suggested(schema, "home_lat") == 45.5
+    assert _suggested(schema, "home_lon") == 3.25
+
+
+async def test_options_edit_home_persists_to_data(hass):
+    entry = MockConfigEntry(domain=DOMAIN, unique_id="u", data=dict(HOME_DATA))
+    entry.add_to_hass(hass)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert _suggested(result["data_schema"], "home_lat") == 48.0
+    assert _suggested(result["data_schema"], "home_lon") == 2.0
+    with patch(SETUP, return_value=True):
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {**OPTS, "home_lat": 43.3, "home_lon": 5.4}
+        )
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert entry.data["home_lat"] == 43.3
+    assert entry.data["home_lon"] == 5.4
+    assert "home_lat" not in result["data"]
+    assert "home_from_ha" not in result["data"]
+
+
+async def test_options_home_from_ha_uses_hass_config(hass):
+    hass.config.latitude = 45.5
+    hass.config.longitude = 3.25
+    entry = MockConfigEntry(domain=DOMAIN, unique_id="u", data=dict(HOME_DATA))
+    entry.add_to_hass(hass)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    with patch(SETUP, return_value=True):
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            {**OPTS, "home_lat": 10.0, "home_lon": 10.0, "home_from_ha": True},
+        )
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert entry.data["home_lat"] == 45.5
+    assert entry.data["home_lon"] == 3.25
+
+
+async def test_options_invalid_coords(hass):
+    entry = MockConfigEntry(domain=DOMAIN, unique_id="u", data=dict(HOME_DATA))
+    entry.add_to_hass(hass)
+    for lat, lon in ((91.0, 2.0), (48.0, 181.0)):
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {**OPTS, "home_lat": lat, "home_lon": lon}
+        )
+        assert result["type"] == FlowResultType.FORM
+        assert result["errors"] == {"base": "invalid_coords"}
+    assert entry.data["home_lat"] == 48.0
+    assert entry.data["home_lon"] == 2.0

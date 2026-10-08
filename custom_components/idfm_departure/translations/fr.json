@@ -9,6 +9,10 @@
           "home_entity": "Entité domicile (zone ou personne)",
           "home_lat": "Latitude du domicile (optionnel)",
           "home_lon": "Longitude du domicile (optionnel)"
+        },
+        "data_description": {
+          "home_lat": "Préremplie avec l'emplacement de la maison Home Assistant ; modifiez-la si besoin. Laisser vide pour utiliser l'entité ci-dessus.",
+          "home_lon": "Préremplie avec l'emplacement de la maison Home Assistant ; modifiez-la si besoin. Laisser vide pour utiliser l'entité ci-dessus."
         }
       },
       "mode": {
@@ -97,9 +101,17 @@
           "departures_count": "Nombre de départs",
           "direct_only": "Trains directs uniquement (sans correspondance)",
           "clear_destination": "Supprimer la gare de destination",
-          "destination_query": "Gare de destination (recherche, laisser vide pour ne rien changer)"
+          "destination_query": "Gare de destination (recherche, laisser vide pour ne rien changer)",
+          "home_lat": "Latitude du domicile",
+          "home_lon": "Longitude du domicile",
+          "home_from_ha": "Reprendre l'emplacement de la maison Home Assistant"
         },
-        "description": "Destination actuelle : {destination}. Le quota PRIM est de 1000 appels/jour par clé API. Appels estimés = fenêtre active / intervalle de rafraîchissement, somme sur toutes les entrées partageant cette clé ; doit rester sous 900."
+        "description": "Destination actuelle : {destination}. Le quota PRIM est de 1000 appels/jour par clé API. Appels estimés = fenêtre active / intervalle de rafraîchissement, somme sur toutes les entrées partageant cette clé ; doit rester sous 900.",
+        "data_description": {
+          "home_lat": "Préremplie avec l'emplacement de la maison Home Assistant ; modifiez-la si besoin. Laisser vide pour utiliser l'entité ci-dessus.",
+          "home_lon": "Préremplie avec l'emplacement de la maison Home Assistant ; modifiez-la si besoin. Laisser vide pour utiliser l'entité ci-dessus.",
+          "home_from_ha": "Remplace les coordonnées ci-dessus par l'emplacement actuel de la maison Home Assistant."
+        }
       },
       "destination_select": {
         "title": "Choisir la gare de destination",
@@ -112,7 +124,8 @@
       "quota_exceeded": "Les appels PRIM estimés par jour (toutes les entrées partageant cette clé API) dépasseraient 900 sur le quota de 1000/jour. Augmentez l'intervalle de rafraîchissement ou réduisez la fenêtre active.",
       "no_results": "Aucun résultat",
       "cannot_connect": "Impossible de se connecter à PRIM",
-      "invalid_auth": "Clé API invalide"
+      "invalid_auth": "Clé API invalide",
+      "invalid_coords": "Coordonnées invalides : la latitude doit être comprise entre -90 et 90, la longitude entre -180 et 180, et les deux doivent être renseignées"
     }
   },
   "entity": {

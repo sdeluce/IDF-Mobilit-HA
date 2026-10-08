@@ -38,7 +38,9 @@ En dehors de la plage d'activité aucune requête n'est émise.
 ## Configuration
 
 1. **Clé API et domicile** : entité `zone.home` par défaut, ou latitude/longitude manuelles
-   (elles priment sur l'entité).
+   (elles priment sur l'entité). Les coordonnées sont préremplies avec l'emplacement de la maison Home
+   Assistant ; modifiables ensuite via « Configurer » (case « Reprendre l'emplacement de la maison Home
+   Assistant » pour les réinitialiser).
 2. **Choix du mode** :
    - *Un arrêt* : recherchez le nom, choisissez l'arrêt, puis (optionnel) une ligne et un filtre de
      direction (texte, insensible à la casse et aux accents).
