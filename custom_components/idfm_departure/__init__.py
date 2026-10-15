@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
 
 import voluptuous as vol
-from homeassistant.components.frontend import add_extra_js_url
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
@@ -17,6 +15,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.start import async_at_started
 from homeassistant.helpers.typing import ConfigType
+from homeassistant.loader import async_get_integration
 
 from .api import PrimClient
 from .const import ATTR_ENTRY_ID, CONF_API_KEY, DOMAIN, PLATFORMS, SERVICE_REFRESH
@@ -39,13 +38,12 @@ async def _async_register_frontend(hass: HomeAssistant) -> None:
     if hass.data.get(_REGISTERED_KEY) or getattr(hass, "http", None) is None:
         return
     hass.data[_REGISTERED_KEY] = True
-    version = json.loads((Path(__file__).parent / "manifest.json").read_text())[
-        "version"
-    ]
+    version = str((await async_get_integration(hass, DOMAIN)).version)
     await hass.http.async_register_static_paths(
         [StaticPathConfig(STATIC_URL, str(_WWW_DIR), cache_headers=False)]
     )
-    add_extra_js_url(hass, f"{STATIC_URL}/{CARD_FILE}?v={version}")
+    # Loaded only as a Lovelace resource: add_extra_js_url runs the script before the
+    # frontend installs its scoped customElements polyfill, which then hides the card.
 
     async def _register_resource(hass: HomeAssistant) -> None:
         await _async_register_resource(hass, version)

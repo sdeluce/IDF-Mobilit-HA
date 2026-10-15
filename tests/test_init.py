@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import json
 from contextlib import ExitStack
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -224,18 +222,13 @@ async def test_static_path_registered_once(hass) -> None:
 
     hass.http = MagicMock()
     hass.http.async_register_static_paths = AsyncMock()
-    with patch("custom_components.idfm_departure.add_extra_js_url") as add_js:
-        await _async_register_frontend(hass)
-        await _async_register_frontend(hass)
+    await _async_register_frontend(hass)
+    await _async_register_frontend(hass)
     hass.http.async_register_static_paths.assert_awaited_once()
     (cfgs,) = hass.http.async_register_static_paths.await_args.args
     assert cfgs[0].url_path == STATIC_URL == "/idfm_departure_static"
     assert cfgs[0].path.endswith("custom_components/idfm_departure/www")
     assert cfgs[0].cache_headers is False
-    add_js.assert_called_once()
-    manifest = Path(__file__).parents[1] / "custom_components/idfm_departure/manifest.json"
-    version = json.loads(manifest.read_text())["version"]
-    assert add_js.call_args.args[1] == f"/idfm_departure_static/idfm-departure-card.js?v={version}"
 
 
 async def test_arrival_sensor_only_with_destination(hass, freezer) -> None:
